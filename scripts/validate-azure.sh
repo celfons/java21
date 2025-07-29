@@ -77,9 +77,14 @@ echo "---------------------------------------"
 if [ -f ".env.azure" ]; then
     echo -e "${GREEN}✓${NC} .env.azure existe"
     
-    # Carregar variáveis do .env.azure
+    # Carregar variáveis do .env.azure apenas se elas não estiverem vazias
     set -a
-    source .env.azure
+    while IFS='=' read -r key value; do
+        # Ignorar comentários e linhas vazias
+        if [[ ! $key =~ ^[[:space:]]*# ]] && [[ -n $key ]] && [[ $value != *"<"* ]]; then
+            export "$key=$value"
+        fi
+    done < .env.azure
     set +a
     
     # Verificar variáveis essenciais
