@@ -1,24 +1,24 @@
-# 🚀 CI/CD Pipeline - Deploy Automatizado para Azure
+# 🚀 CI/CD Pipeline - Automated Deploy to Azure
 
-Este documento descreve a configuração e uso da esteira de CI/CD implementada para o projeto MongoDB-Kafka Connector, que realiza deploy automatizado dos containers Docker no Azure.
+This document describes the configuration and usage of the CI/CD pipeline implemented for the MongoDB-Kafka Connector project, which performs automated deployment of Docker containers to Azure.
 
-## 📋 Visão Geral
+## 📋 Overview
 
-A esteira de CI/CD foi projetada para:
+The CI/CD pipeline was designed to:
 
-- ✅ **Build automatizado** das imagens Docker
-- ✅ **Push para Azure Container Registry (ACR)**
-- ✅ **Deploy para Azure Web App for Containers**
-- ✅ **Deploy alternativo para Azure Container Instances**
-- ✅ **Configuração automática de variáveis de ambiente**
-- ✅ **Verificação de saúde da aplicação**
-- ✅ **Suporte a múltiplos ambientes** (production, staging, development)
+- ✅ **Automated build** of Docker images
+- ✅ **Push to Azure Container Registry (ACR)**
+- ✅ **Deploy to Azure Web App for Containers**
+- ✅ **Alternative deploy to Azure Container Instances**
+- ✅ **Automatic environment variable configuration**
+- ✅ **Application health verification**
+- ✅ **Support for multiple environments** (production, staging, development)
 
-## 🏗️ Arquitetura da Pipeline
+## 🏗️ Pipeline Architecture
 
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   GitHub        │    │   Azure         │    │   Aplicação     │
+│   GitHub        │    │   Azure         │    │   Application   │
 │   Repository    │───▶│   Container     │───▶│   Azure Web App │
 │                 │    │   Registry      │    │   / ACI         │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
@@ -26,59 +26,59 @@ A esteira de CI/CD foi projetada para:
     Push/Dispatch            Build & Push             Deploy & Config
 ```
 
-## 🔧 Workflows Disponíveis
+## 🔧 Available Workflows
 
-### 1. Deploy para Azure Web App (`azure-deploy.yml`)
-
-**Trigger:**
-- Push na branch `main`
-- Dispatch manual
-
-**Funcionalidades:**
-- Build da imagem Kafka Connect
-- Push para Azure Container Registry
-- Deploy para Azure Web App for Containers
-- Configuração de variáveis de ambiente
-- Verificação de saúde
-
-### 2. Deploy para Azure Container Instances (`azure-container-instances.yml`)
+### 1. Deploy to Azure Web App (`azure-deploy.yml`)
 
 **Trigger:**
-- Dispatch manual apenas
+- Push to `main` branch
+- Manual dispatch
 
-**Funcionalidades:**
-- Build da imagem Kafka Connect
-- Deploy para Azure Container Instances
-- Ideal para ambientes de teste/staging
-- Configuração flexível de recursos
+**Features:**
+- Build Kafka Connect image
+- Push to Azure Container Registry
+- Deploy to Azure Web App for Containers
+- Environment variable configuration
+- Health verification
 
-## 🔐 Configuração de Secrets
+### 2. Deploy to Azure Container Instances (`azure-container-instances.yml`)
 
-### Secrets Obrigatórios no GitHub
+**Trigger:**
+- Manual dispatch only
 
-Configure os seguintes secrets no repositório GitHub (`Settings` → `Secrets and variables` → `Actions`):
+**Features:**
+- Build Kafka Connect image
+- Deploy to Azure Container Instances
+- Ideal for test/staging environments
+- Flexible resource configuration
+
+## 🔐 Secrets Configuration
+
+### Required Secrets in GitHub
+
+Configure the following secrets in the GitHub repository (`Settings` → `Secrets and variables` → `Actions`):
 
 #### Azure Container Registry (ACR)
 ```bash
-ACR_REGISTRY=<seu-registry>.azurecr.io
-ACR_USERNAME=<username-do-acr>
-ACR_PASSWORD=<password-do-acr>
+ACR_REGISTRY=<your-registry>.azurecr.io
+ACR_USERNAME=<acr-username>
+ACR_PASSWORD=<acr-password>
 ```
 
 #### Azure Web App
 ```bash
-AZURE_WEBAPP_NAME=<nome-do-web-app>
-AZURE_RESOURCE_GROUP=<nome-do-resource-group>
+AZURE_WEBAPP_NAME=<web-app-name>
+AZURE_RESOURCE_GROUP=<resource-group-name>
 ```
 
-#### Azure Container Instances (Opcional)
+#### Azure Container Instances (Optional)
 ```bash
-ACI_CONTAINER_GROUP_NAME=<nome-do-container-group>
+ACI_CONTAINER_GROUP_NAME=<container-group-name>
 ```
 
-#### Credenciais Azure
+#### Azure Credentials
 ```bash
-AZURE_CREDENTIALS=<json-das-credenciais-azure>
+AZURE_CREDENTIALS=<azure-credentials-json>
 ```
 
 #### MongoDB Atlas
@@ -86,20 +86,20 @@ AZURE_CREDENTIALS=<json-das-credenciais-azure>
 MONGODB_ATLAS_CONNECTION_STRING=mongodb+srv://<user>:<password>@<cluster>.mongodb.net/<database>?retryWrites=true&w=majority
 ```
 
-#### Kafka (Opcional - se usando Kafka externo)
+#### Kafka (Optional - if using external Kafka)
 ```bash
 KAFKA_BOOTSTRAP_SERVERS=<kafka-broker-urls>
 ```
 
-### Como Obter as Credenciais Azure
+### How to Obtain Azure Credentials
 
-#### 1. Criar Service Principal
+#### 1. Create Service Principal
 
 ```bash
-# Login no Azure CLI
+# Login to Azure CLI
 az login
 
-# Criar service principal
+# Create service principal
 az ad sp create-for-rbac \
   --name "mongodb-kafka-cd" \
   --role contributor \
@@ -107,7 +107,7 @@ az ad sp create-for-rbac \
   --sdk-auth
 ```
 
-O comando retornará um JSON que deve ser usado no secret `AZURE_CREDENTIALS`:
+The command will return a JSON that should be used in the `AZURE_CREDENTIALS` secret:
 
 ```json
 {
@@ -124,118 +124,118 @@ O comando retornará um JSON que deve ser usado no secret `AZURE_CREDENTIALS`:
 }
 ```
 
-#### 2. Obter Credenciais do ACR
+#### 2. Get ACR Credentials
 
 ```bash
-# Habilitar admin no ACR
+# Enable admin in ACR
 az acr update --name <registry-name> --admin-enabled true
 
-# Obter credenciais
+# Get credentials
 az acr credential show --name <registry-name>
 ```
 
-## 🌍 Configuração de Ambientes
+## 🌍 Environment Configuration
 
 ### Production
-- **Trigger**: Push automático na branch `main`
+- **Trigger**: Automatic push to `main` branch
 - **Deploy**: Azure Web App for Containers
-- **MongoDB**: Connection string do Atlas produtivo
+- **MongoDB**: Production Atlas connection string
 
 ### Staging/Development
-- **Trigger**: Dispatch manual
+- **Trigger**: Manual dispatch
 - **Deploy**: Azure Container Instances
-- **MongoDB**: Connection string específico do ambiente
+- **MongoDB**: Environment-specific connection string
 
-## 🚀 Como Usar
+## 🚀 How to Use
 
-### Deploy Automático (Production)
+### Automatic Deploy (Production)
 
-1. Faça commit e push na branch `main`:
+1. Make commit and push to `main` branch:
 ```bash
 git add .
-git commit -m "feat: nova funcionalidade"
+git commit -m "feat: new feature"
 git push origin main
 ```
 
-2. A pipeline será executada automaticamente
+2. The pipeline will run automatically
 
-### Deploy Manual
+### Manual Deploy
 
-1. Acesse a aba `Actions` no GitHub
-2. Selecione o workflow desejado
-3. Clique em `Run workflow`
-4. Escolha o ambiente e execute
+1. Access the `Actions` tab in GitHub
+2. Select the desired workflow
+3. Click `Run workflow`
+4. Choose the environment and execute
 
-### Monitoramento
+### Monitoring
 
-Acompanhe o progresso através da aba `Actions` no GitHub. Cada step mostra logs detalhados.
+Track progress through the `Actions` tab in GitHub. Each step shows detailed logs.
 
-## 📊 Verificação de Deploy
+## 📊 Deploy Verification
 
-### URLs de Acesso
+### Access URLs
 
-Após o deploy, a aplicação estará disponível em:
+After deployment, the application will be available at:
 
 - **Azure Web App**: `https://<webapp-name>.azurewebsites.net:8083`
 - **Azure Container Instances**: `http://<container-group-name>.<region>.azurecontainer.io:8083`
 
-### Endpoints da API
+### API Endpoints
 
-- **Status dos Connectors**: `/connectors`
+- **Connector Status**: `/connectors`
 - **Health Check**: `/connector-plugins`
-- **Configuração**: `/connectors/<connector-name>/config`
+- **Configuration**: `/connectors/<connector-name>/config`
 
-### Exemplo de Teste
+### Testing Example
 
 ```bash
-# Verificar status da API
-curl https://<sua-app>.azurewebsites.net:8083/connectors
+# Check API status
+curl https://<your-app>.azurewebsites.net:8083/connectors
 
-# Listar plugins disponíveis
-curl https://<sua-app>.azurewebsites.net:8083/connector-plugins
+# List available plugins
+curl https://<your-app>.azurewebsites.net:8083/connector-plugins
 ```
 
-## 🔍 Solução de Problemas
+## 🔍 Troubleshooting
 
-### Build Falhando
+### Build Failing
 
-1. **Verificar secrets**: Certifique-se que todos os secrets estão configurados
-2. **Verificar ACR**: Confirmar se o registry existe e está acessível
-3. **Logs**: Analisar os logs detalhados na aba Actions
+1. **Check secrets**: Make sure all secrets are configured
+2. **Check ACR**: Confirm that the registry exists and is accessible
+3. **Logs**: Analyze detailed logs in the Actions tab
 
-### Deploy Falhando
+### Deploy Failing
 
-1. **Recursos Azure**: Verificar se o Web App/ACI existe
-2. **Permissões**: Confirmar se o service principal tem as permissões necessárias
-3. **Quotas**: Verificar se há cota disponível na subscription
+1. **Azure Resources**: Check if Web App/ACI exists
+2. **Permissions**: Confirm that the service principal has the necessary permissions
+3. **Quotas**: Check if there's available quota in the subscription
 
-### Aplicação não Responde
+### Application Not Responding
 
-1. **Aguardar**: A aplicação pode levar alguns minutos para inicializar
-2. **Logs**: Verificar logs no Azure Portal
-3. **Variáveis**: Confirmar se as variáveis de ambiente estão corretas
+1. **Wait**: The application may take a few minutes to initialize
+2. **Logs**: Check logs in Azure Portal
+3. **Variables**: Confirm that environment variables are correct
 
-## 🛠️ Customização
+## 🛠️ Customization
 
-### Adicionar Novos Ambientes
+### Add New Environments
 
-1. Edite o workflow YAML
-2. Adicione o novo ambiente em `options`
-3. Configure secrets específicos se necessário
+1. Edit the workflow YAML
+2. Add the new environment in `options`
+3. Configure environment-specific secrets if needed
 
-### Modificar Configuração
+### Modify Configuration
 
-1. Edite as variáveis de ambiente nos workflows
-2. Ajuste os recursos (CPU/Memory) conforme necessário
-3. Adicione novos steps de validação
+1. Edit environment variables in workflows
+2. Adjust resources (CPU/Memory) as needed
+3. Add new validation steps
 
-### Integrar com Outros Serviços
+### Integrate with Other Services
 
-1. Adicione novos jobs nos workflows
-2. Configure secrets adicionais
-3. Implemente health checks específicos
+1. Add new jobs in workflows
+2. Configure additional secrets
+3. Implement specific health checks
 
-## 📚 Recursos Adicionais
+## 📚 Additional Resources
 
 - [Azure Container Registry](https://docs.microsoft.com/azure/container-registry/)
 - [Azure Web App for Containers](https://docs.microsoft.com/azure/app-service/containers/)
@@ -243,15 +243,15 @@ curl https://<sua-app>.azurewebsites.net:8083/connector-plugins
 - [GitHub Actions](https://docs.github.com/actions)
 - [MongoDB Atlas](https://docs.atlas.mongodb.com/)
 
-## 🤝 Contribuindo
+## 🤝 Contributing
 
-Para melhorar a pipeline:
+To improve the pipeline:
 
-1. Fork o repositório
-2. Crie uma branch para sua feature
-3. Teste as modificações
-4. Abra um Pull Request
+1. Fork the repository
+2. Create a branch for your feature
+3. Test the modifications
+4. Open a Pull Request
 
 ---
 
-**⚠️ Importante**: Nunca commite credenciais ou secrets diretamente no código. Use sempre GitHub Secrets para informações sensíveis.
+**⚠️ Important**: Never commit credentials or secrets directly in code. Always use GitHub Secrets for sensitive information.
