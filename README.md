@@ -106,28 +106,28 @@ After setup, access these services:
 - 🚨 **Error Handling**: Dead letter queues
 - 📖 **Documentation**: Comprehensive guides
 
-## ⚙️ Conectores Múltiplos com Filtros por Operação
+## ⚙️ Multiple Connectors with Operation Filters
 
-### 🎯 Visão Geral
+### 🎯 Overview
 
-Este projeto agora inclui **conectores separados** para diferentes tipos de operação do MongoDB, permitindo que cada tipo de evento seja enviado para tópicos Kafka distintos:
+This project now includes **separate connectors** for different MongoDB operation types, allowing each event type to be sent to distinct Kafka topics:
 
-- **🟢 INSERT Connector**: Captura apenas operações de inserção → Tópico `mongo-insert.*`
-- **🟡 UPDATE Connector**: Captura apenas operações de atualização → Tópico `mongo-update.*`
-- **🔴 DELETE Connector**: Captura apenas operações de exclusão → Tópico `mongo-delete.*`
+- **🟢 INSERT Connector**: Captures only insertion operations → Topic `mongo-insert.*`
+- **🟡 UPDATE Connector**: Captures only update operations → Topic `mongo-update.*`
+- **🔴 DELETE Connector**: Captures only deletion operations → Topic `mongo-delete.*`
 
-### 📁 Estrutura dos Conectores
+### 📁 Connector Structure
 
 ```
 connectors/
-├── mongo-insert-connector.json   # Filtra apenas operações INSERT
-├── mongo-update-connector.json   # Filtra apenas operações UPDATE
-└── mongo-delete-connector.json   # Filtra apenas operações DELETE
+├── mongo-insert-connector.json   # Filters only INSERT operations
+├── mongo-update-connector.json   # Filters only UPDATE operations
+└── mongo-delete-connector.json   # Filters only DELETE operations
 ```
 
-### 🔧 Configuração dos Filtros
+### 🔧 Filter Configuration
 
-Cada conector utiliza o **MongoDB Change Stream** com pipeline de agregação para filtrar por `operationType`:
+Each connector uses **MongoDB Change Stream** with aggregation pipeline to filter by `operationType`:
 
 ```json
 {
@@ -142,51 +142,51 @@ Cada conector utiliza o **MongoDB Change Stream** com pipeline de agregação pa
 }
 ```
 
-**Tipos de operação disponíveis:**
-- `insert` - Inserção de novos documentos
-- `update` - Atualização de documentos existentes
-- `delete` - Exclusão de documentos
-- `replace` - Substituição completa de documentos
+**Available operation types:**
+- `insert` - Insertion of new documents
+- `update` - Update of existing documents
+- `delete` - Deletion of documents
+- `replace` - Complete replacement of documents
 
-### 🚀 Como Usar os Conectores Múltiplos
+### 🚀 How to Use Multiple Connectors
 
-#### Opção 1: Setup Completo (Recomendado para novos projetos)
+#### Option 1: Complete Setup (Recommended for new projects)
 ```bash
-# 1. Configuração inicial completa
+# 1. Complete initial setup
 make dev-setup
 
-# 2. Configurar conectores múltiplos com filtros
+# 2. Setup multiple connectors with filters
 make setup-multi-connectors
 ```
 
-#### Opção 2: Apenas Conectores Múltiplos (Para projetos existentes)
+#### Option 2: Multiple Connectors Only (For existing projects)
 ```bash
-# Configurar apenas os conectores com filtros (requer ambiente já iniciado)
+# Setup only the filtered connectors (requires environment already started)
 make setup-multi-connectors
 ```
 
-#### Opção 3: Manual
+#### Option 3: Manual
 ```bash
-# Executar script diretamente
+# Run script directly
 ./scripts/setup-multi-connectors.sh
 ```
 
-### 📋 Tópicos Kafka Criados
+### 📋 Created Kafka Topics
 
-Após a configuração, os seguintes tópicos serão criados automaticamente:
+After setup, the following topics will be created automatically:
 
-| Conector | Tópico de Exemplo | Descrição |
-|----------|------------------|-----------|
-| **INSERT** | `mongo-insert.exemplo.users` | Apenas inserções de usuários |
-| **UPDATE** | `mongo-update.exemplo.users` | Apenas atualizações de usuários |
-| **DELETE** | `mongo-delete.exemplo.users` | Apenas exclusões de usuários |
-| **INSERT** | `mongo-insert.exemplo.products` | Apenas inserções de produtos |
-| **UPDATE** | `mongo-update.exemplo.products` | Apenas atualizações de produtos |
-| **DELETE** | `mongo-delete.exemplo.products` | Apenas exclusões de produtos |
+| Connector | Example Topic | Description |
+|----------|---------------|-------------|
+| **INSERT** | `mongo-insert.exemplo.users` | Only user insertions |
+| **UPDATE** | `mongo-update.exemplo.users` | Only user updates |
+| **DELETE** | `mongo-delete.exemplo.users` | Only user deletions |
+| **INSERT** | `mongo-insert.exemplo.products` | Only product insertions |
+| **UPDATE** | `mongo-update.exemplo.products` | Only product updates |
+| **DELETE** | `mongo-delete.exemplo.products` | Only product deletions |
 
-### 📄 Exemplo de Mensagem Kafka
+### 📄 Kafka Message Example
 
-**Mensagem de INSERT** (tópico: `mongo-insert.exemplo.users`):
+**INSERT Message** (topic: `mongo-insert.exemplo.users`):
 ```json
 {
   "_id": {
@@ -221,7 +221,7 @@ Após a configuração, os seguintes tópicos serão criados automaticamente:
 }
 ```
 
-**Mensagem de UPDATE** (tópico: `mongo-update.exemplo.users`):
+**UPDATE Message** (topic: `mongo-update.exemplo.users`):
 ```json
 {
   "_id": {
@@ -269,7 +269,7 @@ Após a configuração, os seguintes tópicos serão criados automaticamente:
 }
 ```
 
-**Mensagem de DELETE** (tópico: `mongo-delete.exemplo.users`):
+**DELETE Message** (topic: `mongo-delete.exemplo.users`):
 ```json
 {
   "_id": {
@@ -294,91 +294,91 @@ Após a configuração, os seguintes tópicos serão criados automaticamente:
 }
 ```
 
-### 🧪 Testando os Filtros
+### 🧪 Testing the Filters
 
-1. **Inicie o ambiente**:
+1. **Start the environment**:
    ```bash
    make dev-setup
    make setup-multi-connectors
    ```
 
-2. **Insira dados de teste**:
+2. **Insert test data**:
    ```bash
    make sample-data
    ```
 
-3. **Monitore os tópicos** em tempo real:
+3. **Monitor topics** in real-time:
    ```bash
-   # Opção 1: Via interface web (Recomendado)
-   # Acesse http://localhost:8080 e visualize os tópicos
+   # Option 1: Via web interface (Recommended)
+   # Access http://localhost:8080 and view the topics
    
-   # Opção 2: Via linha de comando
+   # Option 2: Via command line
    make monitor-topics
    ```
 
-4. **Teste operações específicas**:
+4. **Test specific operations**:
    ```bash
-   # Conectar ao MongoDB e fazer operações manuais
+   # Connect to MongoDB and perform manual operations
    docker-compose exec mongo1 mongosh "mongodb://admin:password123@localhost:27017/exemplo?authSource=admin"
    
-   # Inserir documento (aparecerá em mongo-insert.exemplo.*)
-   db.users.insertOne({name: "Teste Insert", email: "insert@test.com"})
+   # Insert document (will appear in mongo-insert.exemplo.*)
+   db.users.insertOne({name: "Test Insert", email: "insert@test.com"})
    
-   # Atualizar documento (aparecerá em mongo-update.exemplo.*)
-   db.users.updateOne({name: "Teste Insert"}, {$set: {status: "updated"}})
+   # Update document (will appear in mongo-update.exemplo.*)
+   db.users.updateOne({name: "Test Insert"}, {$set: {status: "updated"}})
    
-   # Excluir documento (aparecerá em mongo-delete.exemplo.*)
-   db.users.deleteOne({name: "Teste Insert"})
+   # Delete document (will appear in mongo-delete.exemplo.*)
+   db.users.deleteOne({name: "Test Insert"})
    ```
 
-### 🔍 Monitoramento e Verificação
+### 🔍 Monitoring and Verification
 
-#### Via Kafka UI (Interface Web)
+#### Via Kafka UI (Web Interface)
 - **URL**: http://localhost:8080
-- Visualize mensagens em tempo real
-- Analise configuração dos conectores
-- Monitore performance e métricas
+- View messages in real-time
+- Analyze connector configuration
+- Monitor performance and metrics
 
-#### Via API do Kafka Connect
+#### Via Kafka Connect API
 ```bash
-# Status de todos os conectores
+# Status of all connectors
 curl -s http://localhost:8083/connectors | jq
 
-# Status específico do conector INSERT
+# Specific status of INSERT connector
 curl -s http://localhost:8083/connectors/mongo-insert-connector/status | jq
 
-# Status específico do conector UPDATE
+# Specific status of UPDATE connector
 curl -s http://localhost:8083/connectors/mongo-update-connector/status | jq
 
-# Status específico do conector DELETE
+# Specific status of DELETE connector
 curl -s http://localhost:8083/connectors/mongo-delete-connector/status | jq
 ```
 
-### ⚠️ Observações Importantes
+### ⚠️ Important Notes
 
-1. **Change Streams**: Requer MongoDB em modo Replica Set (já configurado neste projeto)
-2. **Performance**: Conectores múltiplos consomem mais recursos - monitore o uso
-3. **Dead Letter Queues**: Cada conector tem sua própria DLQ para tratamento de erros
-4. **Tópicos**: Os tópicos são criados automaticamente quando as primeiras mensagens chegam
+1. **Change Streams**: Requires MongoDB in Replica Set mode (already configured in this project)
+2. **Performance**: Multiple connectors consume more resources - monitor usage
+3. **Dead Letter Queues**: Each connector has its own DLQ for error handling
+4. **Topics**: Topics are created automatically when the first messages arrive
 
-### 🎛️ Personalização dos Conectores
+### 🎛️ Connector Customization
 
-Para personalizar os conectores, edite os arquivos JSON em `connectors/`:
+To customize the connectors, edit the JSON files in `connectors/`:
 
 ```bash
-# Editar configuração do conector INSERT
+# Edit INSERT connector configuration
 nano connectors/mongo-insert-connector.json
 
-# Aplicar mudanças (requer reinicialização do conector)
+# Apply changes (requires connector restart)
 make setup-multi-connectors
 ```
 
-**Configurações que podem ser personalizadas:**
-- Database e collections específicas
-- Filtros mais complexos no pipeline
-- Configurações de performance (batch size, poll intervals)
-- Tópicos de destino
-- Formatação das mensagens
+**Configurations that can be customized:**
+- Specific databases and collections
+- More complex pipeline filters
+- Performance settings (batch size, poll intervals)
+- Destination topics
+- Message formatting
 
 ## 🛠️ Available Commands
 
@@ -459,106 +459,106 @@ The MongoDB Source Connector is configured in `config/kafka-connect/mongodb-sour
 
 ## 🏭 Production Deployment
 
-### Azure Cloud Deployment (Automatizado) 🚀
+### Azure Cloud Deployment (Automated) 🚀
 
-Este projeto inclui uma esteira de CI/CD completa para deploy automatizado no Azure:
+This project includes a complete CI/CD pipeline for automated deployment to Azure:
 
-- ✅ **Build e Push automatizado** para Azure Container Registry (ACR)
-- ✅ **Deploy para Azure Web App for Containers** ou Azure Container Instances
-- ✅ **Configuração automática** de variáveis de ambiente
-- ✅ **Integração com MongoDB Atlas** para produção
-- ✅ **Verificação de saúde** automática da aplicação
+- ✅ **Automated Build and Push** to Azure Container Registry (ACR)
+- ✅ **Deploy to Azure Web App for Containers** or Azure Container Instances
+- ✅ **Automatic environment variable configuration**
+- ✅ **MongoDB Atlas integration** for production
+- ✅ **Automatic health verification** of the application
 
-#### 🔧 Configuração Rápida
+#### 🔧 Quick Setup
 
-1. **Configure os Secrets no GitHub** (obrigatório):
+1. **Configure GitHub Secrets** (mandatory):
    ```bash
    # Azure Container Registry
-   ACR_REGISTRY=<seu-registry>.azurecr.io
-   ACR_USERNAME=<username-do-acr>
-   ACR_PASSWORD=<password-do-acr>
+   ACR_REGISTRY=<your-registry>.azurecr.io
+   ACR_USERNAME=<acr-username>
+   ACR_PASSWORD=<acr-password>
    
    # Azure Web App
-   AZURE_WEBAPP_NAME=<nome-do-web-app>
-   AZURE_RESOURCE_GROUP=<nome-do-resource-group>
+   AZURE_WEBAPP_NAME=<web-app-name>
+   AZURE_RESOURCE_GROUP=<resource-group-name>
    
-   # Credenciais Azure (JSON do service principal)
-   AZURE_CREDENTIALS=<json-das-credenciais>
+   # Azure Credentials (service principal JSON)
+   AZURE_CREDENTIALS=<credentials-json>
    
-   # MongoDB Atlas produtivo
+   # Production MongoDB Atlas
    MONGODB_ATLAS_CONNECTION_STRING=mongodb+srv://<user>:<pass>@<cluster>.mongodb.net/<db>
    ```
 
-2. **Deploy Automático**:
-   - Push na branch `main` → Deploy automático para produção
-   - Dispatch manual → Deploy para staging/development
+2. **Automatic Deploy**:
+   - Push to `main` branch → Automatic deployment to production
+   - Manual dispatch → Deploy to staging/development
 
-3. **Acesso à Aplicação**:
+3. **Application Access**:
    - **URL**: `https://<webapp-name>.azurewebsites.net:8083`
    - **API Connectors**: `/connectors`
    - **Health Check**: `/connector-plugins`
 
-#### 📚 Documentação Completa
+#### 📚 Complete Documentation
 
-Veja a [documentação completa do CI/CD](.github/workflows/README.md) para:
-- Configuração detalhada dos secrets
-- Como obter credenciais Azure
-- Troubleshooting e solução de problemas
-- Customização da pipeline
+See the [complete CI/CD documentation](.github/workflows/README.md) for:
+- Detailed secrets configuration
+- How to obtain Azure credentials
+- Troubleshooting and problem solving
+- Pipeline customization
 
-#### 🔐 Exemplos de Configuração dos Secrets
+#### 🔐 Secrets Configuration Examples
 
-**Como configurar os secrets no GitHub:**
+**How to configure secrets in GitHub:**
 
-1. Acesse `Settings` → `Secrets and variables` → `Actions` no seu repositório
-2. Clique em `New repository secret` para cada um:
+1. Access `Settings` → `Secrets and variables` → `Actions` in your repository
+2. Click `New repository secret` for each one:
 
 ```bash
-# Exemplo de AZURE_CREDENTIALS (JSON do service principal):
+# Example of AZURE_CREDENTIALS (service principal JSON):
 {
   "clientId": "12345678-1234-1234-1234-123456789012",
-  "clientSecret": "sua-secret-key-aqui",
+  "clientSecret": "your-secret-key-here",
   "subscriptionId": "87654321-4321-4321-4321-210987654321",
   "tenantId": "11111111-2222-3333-4444-555555555555"
 }
 
-# Exemplo de ACR_REGISTRY:
-meuregistry.azurecr.io
+# Example of ACR_REGISTRY:
+myregistry.azurecr.io
 
-# Exemplo de MONGODB_ATLAS_CONNECTION_STRING:
-mongodb+srv://admin:password123@cluster0.abcde.mongodb.net/producao?retryWrites=true&w=majority
+# Example of MONGODB_ATLAS_CONNECTION_STRING:
+mongodb+srv://admin:password123@cluster0.abcde.mongodb.net/production?retryWrites=true&w=majority
 ```
 
-**Como obter as credenciais Azure:**
+**How to obtain Azure credentials:**
 ```bash
-# 1. Login no Azure CLI
+# 1. Login to Azure CLI
 az login
 
-# 2. Criar service principal
+# 2. Create service principal
 az ad sp create-for-rbac \
   --name "mongodb-kafka-cd" \
   --role contributor \
   --scopes /subscriptions/YOUR_SUBSCRIPTION_ID \
   --sdk-auth
 
-# 3. Habilitar admin no ACR
-az acr update --name SEU_REGISTRY --admin-enabled true
+# 3. Enable admin in ACR
+az acr update --name YOUR_REGISTRY --admin-enabled true
 
-# 4. Obter credenciais do ACR
-az acr credential show --name SEU_REGISTRY
+# 4. Get ACR credentials
+az acr credential show --name YOUR_REGISTRY
 ```
 
-### Deployment Tradicional
+### Traditional Deployment
 
-Para ambientes on-premise ou outras clouds:
+For on-premise environments or other clouds:
 
-1. **Security**: Configure authentication e TLS
-2. **Scaling**: Aumente replica set e partições do Kafka
-3. **Monitoring**: Configure logs e alertas
-4. **Networking**: Configure segurança de rede adequada
-5. **Backup**: Implemente estratégias de backup automatizado
+1. **Security**: Configure authentication and TLS
+2. **Scaling**: Increase replica set and Kafka partitions
+3. **Monitoring**: Configure logs and alerts
+4. **Networking**: Configure appropriate network security
+5. **Backup**: Implement automated backup strategies
 
-Veja o [Guia de Setup para Produção](docs/SETUP.md#production-deployment) para detalhes.
+See the [Production Setup Guide](docs/SETUP.md#production-deployment) for details.
 
 ## 🤝 Contributing
 
