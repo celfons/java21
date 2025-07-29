@@ -78,7 +78,7 @@ check_mongodb_health() {
     
     for container in "${mongo_containers[@]}"; do
         if check_container_status "$container"; then
-            if docker-compose exec -T "$container" mongosh --eval 'db.adminCommand({ping: 1})' &> /dev/null; then
+            if $DOCKER_COMPOSE exec -T "$container" mongosh --eval 'db.adminCommand({ping: 1})' &> /dev/null; then
                 log INFO "  ✓ $container: responde a ping"
                 ((healthy_count++))
             else
@@ -89,7 +89,7 @@ check_mongodb_health() {
     
     # Verificar replica set
     if [ $healthy_count -gt 0 ]; then
-        if docker-compose exec -T mongo-primary mongosh --eval '
+        if $DOCKER_COMPOSE exec -T mongo-primary mongosh --eval '
             try {
                 const status = rs.status();
                 const primary = status.members.find(m => m.stateStr === "PRIMARY");
@@ -122,7 +122,7 @@ check_kafka_health() {
     
     # Verificar Zookeeper
     if check_container_status "zookeeper"; then
-        if docker-compose exec -T zookeeper bash -c 'echo "ruok" | nc localhost 2181' 2>/dev/null | grep -q "imok"; then
+        if $DOCKER_COMPOSE exec -T zookeeper bash -c 'echo "ruok" | nc localhost 2181' 2>/dev/null | grep -q "imok"; then
             log INFO "  ✓ Zookeeper: responde corretamente"
         else
             log ERROR "  ✗ Zookeeper: não responde corretamente"
@@ -131,12 +131,12 @@ check_kafka_health() {
     
     # Verificar Kafka broker
     if check_container_status "kafka"; then
-        if docker-compose exec -T kafka kafka-broker-api-versions --bootstrap-server localhost:9092 &> /dev/null; then
+        if $DOCKER_COMPOSE exec -T kafka kafka-broker-api-versions --bootstrap-server localhost:9092 &> /dev/null; then
             log INFO "  ✓ Kafka Broker: responde a API calls"
             
             # Verificar tópicos
             local topic_count
-            topic_count=$(docker-compose exec -T kafka kafka-topics --bootstrap-server localhost:9092 --list | wc -l)
+            topic_count=$($DOCKER_COMPOSE exec -T kafka kafka-topics --bootstrap-server localhost:9092 --list | wc -l)
             log INFO "  ✓ Tópicos disponíveis: $topic_count"
         else
             log ERROR "  ✗ Kafka Broker: não responde a API calls"
@@ -274,7 +274,17 @@ main() {
     
     # Verificar dependências
     check_command "docker"
-    check_command "docker-compose"
+    
+    # Detectar versão do docker compose
+    if command -v docker-compose &> /dev/null; then
+        DOCKER_COMPOSE="docker-compose"
+    elif docker compose version &> /dev/null; then
+        DOCKER_COMPOSE="docker compose"
+    else
+        log ERROR "Docker Compose não encontrado. Instale Docker Compose v2 ou v1."
+        exit 1
+    fi
+    
     check_command "curl"
     
     # Navegar para o diretório do projeto

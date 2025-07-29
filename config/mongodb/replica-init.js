@@ -68,27 +68,6 @@ try {
                 sleep(1000);
             }
             
-            // Cria usuário administrador se não existir
-            try {
-                db = db.getSiblingDB('admin');
-                const userExists = db.getUser('admin');
-                if (!userExists) {
-                    db.createUser({
-                        user: 'admin',
-                        pwd: 'password123',
-                        roles: [
-                            { role: 'root', db: 'admin' },
-                            { role: 'readWriteAnyDatabase', db: 'admin' }
-                        ]
-                    });
-                    print('Usuário administrador criado com sucesso!');
-                } else {
-                    print('Usuário administrador já existe.');
-                }
-            } catch (e) {
-                print('Erro ao criar usuário administrador: ' + e.message);
-            }
-            
             // Cria database e collection de exemplo
             try {
                 db = db.getSiblingDB('inventory');
