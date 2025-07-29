@@ -16,6 +16,9 @@ services:
       - mongo1_data:/data/db
       - ./config/mongodb:/docker-entrypoint-initdb.d
       - ./scripts/sample-data.js:/tmp/sample-data.js
+      - ./scripts/ttl-setup.js:/tmp/ttl-setup.js
+      - ./scripts/ttl-sample-data.js:/tmp/ttl-sample-data.js
+      - ./scripts/ttl-monitor.js:/tmp/ttl-monitor.js
     networks:
       - kafka-mongodb-network
     healthcheck:

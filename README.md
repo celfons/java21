@@ -380,6 +380,272 @@ make setup-multi-connectors
 - Destination topics
 - Message formatting
 
+## 🕒 TTL (Time To Live) Index Example
+
+### Overview
+
+This project includes a complete example of MongoDB **TTL (Time To Live) indexes** with **Change Streams** to capture document expiration events. TTL indexes automatically delete documents when they reach their expiration time, and these deletions are captured in real-time by Change Streams and forwarded to Kafka.
+
+### 🎯 What You'll Learn
+
+- How to create TTL indexes for automatic document expiration
+- How Change Streams capture TTL expiration events as delete operations
+- How the MongoDB Kafka Connector forwards TTL deletions to Kafka topics
+- Real-time monitoring of document lifecycle events
+
+### 📋 TTL Example Components
+
+| Component | Description |
+|-----------|-------------|
+| **TTL Indexes** | Automatic document expiration based on date fields |
+| **Sample Data** | Sessions and tokens that expire at different intervals |
+| **Change Stream Monitor** | Real-time monitoring of TTL expiration events |
+| **Kafka Integration** | TTL deletions forwarded to Kafka topics |
+
+### 🚀 Quick Start - TTL Example
+
+```bash
+# 1. Start the environment (if not already running)
+make dev-setup
+
+# 2. Setup TTL indexes and insert sample data
+make ttl-demo
+
+# 3. Monitor TTL expiration events in real-time
+make ttl-monitor
+
+# 4. In another terminal, watch Kafka topics for TTL events
+make monitor-topics
+```
+
+### 📊 TTL Collections Created
+
+The example creates two collections with different TTL configurations:
+
+#### 1. Sessions Collection
+- **TTL Field**: `expiresAt`
+- **Expiration**: Documents expire when `expiresAt` time is reached
+- **Use Case**: User sessions, temporary data
+- **Sample Expiration**: 30-150 seconds (for demo purposes)
+
+```javascript
+// TTL Index
+db.sessions.createIndex(
+    { "expiresAt": 1 }, 
+    { expireAfterSeconds: 0 }
+)
+
+// Sample Document
+{
+    sessionId: "sess_demo_001",
+    userId: "user_123",
+    expiresAt: ISODate("2024-01-01T12:30:00Z"), // Expires at this exact time
+    isActive: true
+}
+```
+
+#### 2. User Tokens Collection
+- **TTL Field**: `createdAt`
+- **Expiration**: Documents expire 60 seconds after `createdAt`
+- **Use Case**: API tokens, temporary access keys
+- **Sample Expiration**: 60 seconds after creation
+
+```javascript
+// TTL Index
+db.user_tokens.createIndex(
+    { "createdAt": 1 }, 
+    { expireAfterSeconds: 60 }
+)
+
+// Sample Document
+{
+    tokenId: "token_api_001",
+    userId: "user_123", 
+    createdAt: ISODate("2024-01-01T12:00:00Z"), // Expires 60 seconds after this time
+    tokenType: "api_key"
+}
+```
+
+### 🔍 Monitoring TTL Expiration Events
+
+#### Via Change Stream Monitor
+```bash
+# Real-time monitoring of TTL deletions
+make ttl-monitor
+```
+
+**Sample Output:**
+```
+🗑️  TTL EXPIRATION EVENT #1
+   Time: 2024-01-01T12:30:01.000Z
+   Database: exemplo
+   Collection: sessions
+   Operation: delete
+   Document ID: {"_id": ObjectId("...") }
+   🕒 TTL Type: Session expiration (expiresAt field)
+```
+
+#### Via Kafka Topics
+TTL expiration events appear in Kafka topics as **delete operations**:
+
+```bash
+# Monitor Kafka topics for TTL events
+make monitor-topics
+
+# Or monitor specific delete operations
+docker-compose exec kafka kafka-console-consumer \
+    --bootstrap-server localhost:9092 \
+    --topic mongo-delete.exemplo.sessions \
+    --from-beginning
+```
+
+**Sample Kafka Message for TTL Expiration:**
+```json
+{
+    "_id": {
+        "_data": "82644F2A8F000000012B0429296E1404"
+    },
+    "operationType": "delete",
+    "clusterTime": {
+        "$timestamp": {
+            "t": 1682951295,
+            "i": 1
+        }
+    },
+    "ns": {
+        "db": "exemplo",
+        "coll": "sessions"
+    },
+    "documentKey": {
+        "_id": {
+            "$oid": "644f2a8d1234567890abcdef"
+        }
+    }
+}
+```
+
+### ⚙️ TTL Commands
+
+```bash
+# Setup TTL indexes only
+make ttl-setup
+
+# Insert TTL sample data only  
+make ttl-sample-data
+
+# Complete TTL demo (indexes + data)
+make ttl-demo
+
+# Monitor TTL expiration events
+make ttl-monitor
+
+# Monitor via Kafka UI (Web interface)
+# Visit: http://localhost:8080
+```
+
+### 📚 Understanding TTL Behavior
+
+#### TTL Background Process
+- MongoDB runs a background task **every 60 seconds** to remove expired documents
+- Documents may not be deleted exactly at expiration time (up to 60-second delay)
+- TTL deletions are captured by Change Streams as `delete` operations
+
+#### TTL vs Manual Deletion
+- **TTL Deletions**: Automatic, triggered by MongoDB's background process
+- **Manual Deletions**: Triggered by application code or user actions
+- **Both appear identically** in Change Streams as `delete` operations
+
+#### Change Stream Integration
+1. **TTL Index**: Marks documents for expiration
+2. **Background Task**: MongoDB deletes expired documents
+3. **Change Stream**: Captures deletion as `delete` operation
+4. **Kafka Connector**: Forwards event to Kafka topic
+5. **Consumers**: Process TTL expiration events
+
+### 🧪 Testing Scenarios
+
+#### Scenario 1: Immediate Expiration
+```bash
+# Insert document that expires in 30 seconds
+make ttl-sample-data
+
+# Monitor for expiration (wait 1-2 minutes)
+make ttl-monitor
+```
+
+#### Scenario 2: Continuous Expiration
+The sample data creates multiple documents that expire at different intervals, demonstrating:
+- Batch expiration events
+- Staggered expiration timing
+- Real-time Change Stream notifications
+
+#### Scenario 3: Kafka Integration
+```bash
+# Terminal 1: Monitor Change Streams
+make ttl-monitor
+
+# Terminal 2: Monitor Kafka topics
+make monitor-topics  
+
+# Terminal 3: Watch Kafka UI
+# Visit: http://localhost:8080
+```
+
+### 🔧 Customizing TTL Configuration
+
+#### Create Custom TTL Index
+```javascript
+// Expire documents 30 minutes after creation
+db.mycollection.createIndex(
+    { "createdAt": 1 },
+    { expireAfterSeconds: 1800 }
+)
+
+// Expire documents at specific time
+db.mycollection.createIndex(
+    { "expiresAt": 1 },
+    { expireAfterSeconds: 0 }
+)
+```
+
+#### Production TTL Examples
+```javascript
+// User sessions (30 minutes)
+db.sessions.createIndex(
+    { "lastActivity": 1 },
+    { expireAfterSeconds: 1800 }
+)
+
+// Email verification tokens (24 hours)
+db.verification_tokens.createIndex(
+    { "createdAt": 1 },
+    { expireAfterSeconds: 86400 }
+)
+
+// Audit logs (90 days)
+db.audit_logs.createIndex(
+    { "timestamp": 1 },
+    { expireAfterSeconds: 7776000 }
+)
+```
+
+### ⚠️ Important Notes
+
+1. **Replica Set Required**: TTL indexes work with Change Streams only in replica set mode
+2. **Background Task**: TTL cleanup runs every 60 seconds, not immediately
+3. **Index Limitations**: TTL field must be Date or array of Dates
+4. **Compound Indexes**: TTL setting only applies to first field in compound index
+5. **Performance**: TTL operations are lightweight but consider impact on large collections
+
+### 🎛️ Kafka Connect TTL Integration
+
+The MongoDB Kafka Connector automatically captures TTL expiration events:
+
+- **Topic Naming**: `mongodb.exemplo.sessions` (or with operation prefix if using filtered connectors)
+- **Message Format**: Standard MongoDB Change Stream delete event
+- **Filtering**: Use Change Stream pipelines to filter TTL events specifically
+- **Dead Letter Queue**: Failed TTL events are handled like other connector errors
+
 ## 🛠️ Available Commands
 
 ```bash
