@@ -1,0 +1,1 @@
+# mongodb-kafka-connector-example
