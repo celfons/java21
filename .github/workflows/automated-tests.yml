@@ -50,10 +50,11 @@ jobs:
         sudo apt-get install -y mongodb-mongosh
         
         # Create docker-compose alias for compatibility with existing scripts
-        sudo ln -sf /usr/local/bin/docker-compose /usr/bin/docker-compose || true
-        echo '#!/bin/bash' | sudo tee /usr/bin/docker-compose
-        echo 'docker compose "$@"' | sudo tee -a /usr/bin/docker-compose
-        sudo chmod +x /usr/bin/docker-compose
+        sudo tee /usr/local/bin/docker-compose > /dev/null << 'EOF'
+        #!/bin/bash
+        exec docker compose "$@"
+        EOF
+        sudo chmod +x /usr/local/bin/docker-compose
 
     - name: 'Create Environment File'
       run: |
@@ -66,6 +67,7 @@ jobs:
     - name: 'Validate Configuration Files'
       run: |
         echo "Running configuration validation..."
+        chmod +x validate.sh
         ./validate.sh
         
     - name: 'Build Custom Docker Images'
