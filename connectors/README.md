@@ -1,70 +1,70 @@
-# MongoDB Kafka Connectors - Filtros por Operação
+# MongoDB Kafka Connectors - Operation Filters
 
-Este diretório contém as configurações dos conectores MongoDB Kafka Connect com filtros por tipo de operação.
+This directory contains the configurations for MongoDB Kafka Connect connectors with filters by operation type.
 
-## 📁 Estrutura dos Arquivos
+## 📁 File Structure
 
-- `mongo-insert-connector.json` - Conector para capturar apenas operações INSERT
-- `mongo-update-connector.json` - Conector para capturar apenas operações UPDATE  
-- `mongo-delete-connector.json` - Conector para capturar apenas operações DELETE
+- `mongo-insert-connector.json` - Connector to capture only INSERT operations
+- `mongo-update-connector.json` - Connector to capture only UPDATE operations  
+- `mongo-delete-connector.json` - Connector to capture only DELETE operations
 
-## 🔧 Como Funcionam os Filtros
+## 🔧 How Filters Work
 
-Cada conector utiliza o pipeline de agregação do MongoDB Change Stream para filtrar eventos:
+Each connector uses the MongoDB Change Stream aggregation pipeline to filter events:
 
 ```json
 "pipeline": "[{\"$match\": {\"operationType\": \"insert\"}}]"
 ```
 
-### Tipos de Operação Disponíveis
+### Available Operation Types
 
-- `insert` - Inserção de novos documentos
-- `update` - Atualização de documentos existentes
-- `delete` - Exclusão de documentos
-- `replace` - Substituição completa de documentos
-- `drop` - Exclusão de coleção
-- `rename` - Renomeação de coleção
-- `dropDatabase` - Exclusão de database
-- `invalidate` - Invalidação do change stream
+- `insert` - Insertion of new documents
+- `update` - Update of existing documents
+- `delete` - Deletion of documents
+- `replace` - Complete replacement of documents
+- `drop` - Collection deletion
+- `rename` - Collection renaming
+- `dropDatabase` - Database deletion
+- `invalidate` - Change stream invalidation
 
-## 📊 Configurações dos Tópicos
+## 📊 Topic Configuration
 
-Cada conector envia para tópicos com prefixos diferentes:
+Each connector sends to topics with different prefixes:
 
-| Conector | Prefixo | Exemplo de Tópico |
-|----------|---------|-------------------|
+| Connector | Prefix | Example Topic |
+|----------|---------|---------------|
 | INSERT | `mongo-insert` | `mongo-insert.exemplo.users` |
 | UPDATE | `mongo-update` | `mongo-update.exemplo.users` |
 | DELETE | `mongo-delete` | `mongo-delete.exemplo.users` |
 
-## 🚀 Uso
+## 🚀 Usage
 
-Para aplicar essas configurações, execute:
+To apply these configurations, run:
 
 ```bash
 # Via Makefile
 make setup-multi-connectors
 
-# Ou diretamente
+# Or directly
 ./scripts/setup-multi-connectors.sh
 ```
 
-## ⚙️ Personalização
+## ⚙️ Customization
 
-### Modificar Database/Collection
+### Modify Database/Collection
 
-Para alterar o database ou filtrar collections específicas:
+To change the database or filter specific collections:
 
 ```json
 {
-  "database": "meu_banco",
-  "collection": "minha_collection"
+  "database": "my_database",
+  "collection": "my_collection"
 }
 ```
 
-### Filtros Mais Complexos
+### More Complex Filters
 
-Exemplo de pipeline mais avançado:
+Example of advanced pipeline:
 
 ```json
 "pipeline": "[
@@ -75,7 +75,7 @@ Exemplo de pipeline mais avançado:
 ]"
 ```
 
-### Configurações de Performance
+### Performance Settings
 
 ```json
 {
@@ -85,15 +85,15 @@ Exemplo de pipeline mais avançado:
 }
 ```
 
-## 🔍 Monitoramento
+## 🔍 Monitoring
 
-Cada conector possui sua própria Dead Letter Queue (DLQ):
+Each connector has its own Dead Letter Queue (DLQ):
 
-- `mongo-insert-dlq` - Para erros do conector INSERT
-- `mongo-update-dlq` - Para erros do conector UPDATE
-- `mongo-delete-dlq` - Para erros do conector DELETE
+- `mongo-insert-dlq` - For INSERT connector errors
+- `mongo-update-dlq` - For UPDATE connector errors
+- `mongo-delete-dlq` - For DELETE connector errors
 
-## 📚 Referências
+## 📚 References
 
 - [MongoDB Kafka Connector Documentation](https://docs.mongodb.com/kafka-connector/)
 - [MongoDB Change Streams](https://docs.mongodb.com/manual/changeStreams/)
