@@ -11,6 +11,11 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
+# Configuration
+MONGO_USER=${MONGO_INITDB_ROOT_USERNAME:-admin}
+MONGO_PASS=${MONGO_INITDB_ROOT_PASSWORD:-password123}
+HEALTH_CHECK_TIMEOUT=${HEALTH_CHECK_TIMEOUT:-30}
+
 SERVICES=(
     "mongo1:27017:MongoDB Primary"
     "mongo2:27017:MongoDB Secondary 1"
@@ -38,8 +43,12 @@ check_service() {
     
     case $port in
         27017)
-            # MongoDB health check
-            if mongosh --host "$host_port" --eval "db.adminCommand('ping')" --quiet > /dev/null 2>&1; then
+            # MongoDB health check with authentication
+            if timeout $HEALTH_CHECK_TIMEOUT mongosh --host "$host_port" \
+                --username "$MONGO_USER" \
+                --password "$MONGO_PASS" \
+                --authenticationDatabase admin \
+                --eval "db.adminCommand('ping')" --quiet > /dev/null 2>&1; then
                 echo -e "${GREEN}✓ Healthy${NC}"
                 return 0
             else
@@ -94,7 +103,11 @@ check_service() {
 check_mongodb_replica_set() {
     echo -e "${BLUE}=== MongoDB Replica Set Status ===${NC}"
     
-    if mongosh --host mongo1:27017 --eval "rs.status()" --quiet 2>/dev/null; then
+    if timeout $HEALTH_CHECK_TIMEOUT mongosh --host mongo1:27017 \
+        --username "$MONGO_USER" \
+        --password "$MONGO_PASS" \
+        --authenticationDatabase admin \
+        --eval "rs.status()" --quiet 2>/dev/null; then
         echo -e "${GREEN}✓ Replica set is operational${NC}"
     else
         echo -e "${RED}✗ Replica set check failed${NC}"
