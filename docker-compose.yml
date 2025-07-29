@@ -1,0 +1,243 @@
+version: '3.8'
+
+services:
+  # MongoDB Replica Set - Primary
+  mongo1:
+    image: mongo:7.0
+    container_name: mongo1
+    restart: unless-stopped
+    command: mongod --replSet ${MONGO_REPLICA_SET_NAME:-rs0} --bind_ip_all --port 27017
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME:-admin}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:-password123}
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo1_data:/data/db
+      - ./config/mongodb:/docker-entrypoint-initdb.d
+      - ./scripts/sample-data.js:/tmp/sample-data.js
+    networks:
+      - kafka-mongodb-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: ${HEALTH_CHECK_INTERVAL:-30s}
+      timeout: ${HEALTH_CHECK_TIMEOUT:-10s}
+      retries: ${HEALTH_CHECK_RETRIES:-3}
+      start_period: 60s
+
+  # MongoDB Replica Set - Secondary 1
+  mongo2:
+    image: mongo:7.0
+    container_name: mongo2
+    restart: unless-stopped
+    command: mongod --replSet ${MONGO_REPLICA_SET_NAME:-rs0} --bind_ip_all --port 27017
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME:-admin}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:-password123}
+    ports:
+      - "27018:27017"
+    volumes:
+      - mongo2_data:/data/db
+    networks:
+      - kafka-mongodb-network
+    depends_on:
+      mongo1:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: ${HEALTH_CHECK_INTERVAL:-30s}
+      timeout: ${HEALTH_CHECK_TIMEOUT:-10s}
+      retries: ${HEALTH_CHECK_RETRIES:-3}
+      start_period: 60s
+
+  # MongoDB Replica Set - Secondary 2
+  mongo3:
+    image: mongo:7.0
+    container_name: mongo3
+    restart: unless-stopped
+    command: mongod --replSet ${MONGO_REPLICA_SET_NAME:-rs0} --bind_ip_all --port 27017
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME:-admin}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:-password123}
+    ports:
+      - "27019:27017"
+    volumes:
+      - mongo3_data:/data/db
+    networks:
+      - kafka-mongodb-network
+    depends_on:
+      mongo1:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: ${HEALTH_CHECK_INTERVAL:-30s}
+      timeout: ${HEALTH_CHECK_TIMEOUT:-10s}
+      retries: ${HEALTH_CHECK_RETRIES:-3}
+      start_period: 60s
+
+  # Zookeeper for Kafka coordination
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    container_name: zookeeper
+    restart: unless-stopped
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+      ZOOKEEPER_SYNC_LIMIT: 2
+    ports:
+      - "2181:2181"
+    volumes:
+      - zookeeper_data:/var/lib/zookeeper/data
+      - zookeeper_logs:/var/lib/zookeeper/log
+    networks:
+      - kafka-mongodb-network
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "2181"]
+      interval: ${HEALTH_CHECK_INTERVAL:-30s}
+      timeout: ${HEALTH_CHECK_TIMEOUT:-10s}
+      retries: ${HEALTH_CHECK_RETRIES:-3}
+      start_period: 30s
+
+  # Kafka Broker
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    container_name: kafka
+    restart: unless-stopped
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    environment:
+      KAFKA_BROKER_ID: ${KAFKA_BROKER_ID:-1}
+      KAFKA_ZOOKEEPER_CONNECT: ${KAFKA_ZOOKEEPER_CONNECT:-zookeeper:2181}
+      KAFKA_ADVERTISED_LISTENERS: ${KAFKA_ADVERTISED_LISTENERS:-PLAINTEXT://localhost:9092}
+      KAFKA_LISTENERS: ${KAFKA_LISTENERS:-PLAINTEXT://0.0.0.0:9092}
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_LOG_RETENTION_HOURS: 168
+      KAFKA_LOG_SEGMENT_BYTES: 1073741824
+    ports:
+      - "9092:9092"
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    networks:
+      - kafka-mongodb-network
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: ${HEALTH_CHECK_INTERVAL:-30s}
+      timeout: ${HEALTH_CHECK_TIMEOUT:-10s}
+      retries: ${HEALTH_CHECK_RETRIES:-3}
+      start_period: 60s
+
+  # Kafka Connect with MongoDB Source Connector
+  kafka-connect:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: kafka-connect
+    restart: unless-stopped
+    depends_on:
+      kafka:
+        condition: service_healthy
+      mongo1:
+        condition: service_healthy
+    environment:
+      CONNECT_BOOTSTRAP_SERVERS: ${CONNECT_BOOTSTRAP_SERVERS:-kafka:9092}
+      CONNECT_REST_ADVERTISED_HOST_NAME: kafka-connect
+      CONNECT_REST_PORT: 8083
+      CONNECT_GROUP_ID: ${CONNECT_GROUP_ID:-connect-cluster}
+      CONNECT_CONFIG_STORAGE_TOPIC: ${CONNECT_CONFIG_STORAGE_TOPIC:-connect-configs}
+      CONNECT_OFFSET_STORAGE_TOPIC: ${CONNECT_OFFSET_STORAGE_TOPIC:-connect-offsets}
+      CONNECT_STATUS_STORAGE_TOPIC: ${CONNECT_STATUS_STORAGE_TOPIC:-connect-status}
+      CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR: ${CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR:-1}
+      CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR: ${CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR:-1}
+      CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: ${CONNECT_STATUS_STORAGE_REPLICATION_FACTOR:-1}
+      CONNECT_KEY_CONVERTER: ${CONNECT_KEY_CONVERTER:-org.apache.kafka.connect.json.JsonConverter}
+      CONNECT_VALUE_CONVERTER: ${CONNECT_VALUE_CONVERTER:-org.apache.kafka.connect.json.JsonConverter}
+      CONNECT_KEY_CONVERTER_SCHEMAS_ENABLE: "false"
+      CONNECT_VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
+      CONNECT_PLUGIN_PATH: "/usr/share/java,/usr/share/confluent-hub-components"
+      CONNECT_LOG4J_ROOT_LOGLEVEL: INFO
+      CONNECT_LOG4J_LOGGERS: "org.apache.kafka.connect.runtime.rest=WARN,org.reflections=ERROR"
+    ports:
+      - "8083:8083"
+    volumes:
+      - ./config/kafka-connect:/etc/kafka-connect
+    networks:
+      - kafka-mongodb-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8083/connectors"]
+      interval: ${HEALTH_CHECK_INTERVAL:-30s}
+      timeout: ${HEALTH_CHECK_TIMEOUT:-10s}
+      retries: ${HEALTH_CHECK_RETRIES:-3}
+      start_period: 120s
+
+  # Kafka UI for monitoring
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
+    restart: unless-stopped
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+      KAFKA_CLUSTERS_0_KAFKACONNECT_0_NAME: connect
+      KAFKA_CLUSTERS_0_KAFKACONNECT_0_ADDRESS: http://kafka-connect:8083
+    ports:
+      - "${KAFKA_UI_PORT:-8080}:8080"
+    networks:
+      - kafka-mongodb-network
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080"]
+      interval: ${HEALTH_CHECK_INTERVAL:-30s}
+      timeout: ${HEALTH_CHECK_TIMEOUT:-10s}
+      retries: ${HEALTH_CHECK_RETRIES:-3}
+      start_period: 30s
+
+  # MongoDB Express for database administration
+  mongo-express:
+    image: mongo-express:1.0.2
+    container_name: mongo-express
+    restart: unless-stopped
+    depends_on:
+      mongo1:
+        condition: service_healthy
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: ${MONGO_INITDB_ROOT_USERNAME:-admin}
+      ME_CONFIG_MONGODB_ADMINPASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:-password123}
+      ME_CONFIG_MONGODB_URL: mongodb://${MONGO_INITDB_ROOT_USERNAME:-admin}:${MONGO_INITDB_ROOT_PASSWORD:-password123}@mongo1:27017/?authSource=admin
+      ME_CONFIG_BASICAUTH_USERNAME: admin
+      ME_CONFIG_BASICAUTH_PASSWORD: admin
+    ports:
+      - "${MONGO_EXPRESS_PORT:-8081}:8081"
+    networks:
+      - kafka-mongodb-network
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8081"]
+      interval: ${HEALTH_CHECK_INTERVAL:-30s}
+      timeout: ${HEALTH_CHECK_TIMEOUT:-10s}
+      retries: ${HEALTH_CHECK_RETRIES:-3}
+      start_period: 30s
+
+networks:
+  kafka-mongodb-network:
+    driver: bridge
+    name: kafka-mongodb-network
+
+volumes:
+  mongo1_data:
+    driver: local
+  mongo2_data:
+    driver: local
+  mongo3_data:
+    driver: local
+  zookeeper_data:
+    driver: local
+  zookeeper_logs:
+    driver: local
+  kafka_data:
+    driver: local
