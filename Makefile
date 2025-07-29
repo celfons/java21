@@ -48,6 +48,11 @@ setup: .env build up ## Complete setup: build, start services, initialize replic
 	@echo ""
 	@make status
 
+# Setup multiple filtered connectors
+setup-multi-connectors: ## Setup multiple connectors with operation filtering (insert, update, delete)
+	@echo "Setting up multiple MongoDB Kafka connectors with operation filtering..."
+	@./scripts/setup-multi-connectors.sh
+
 # View logs
 logs: ## Show logs for all services
 	docker-compose logs -f

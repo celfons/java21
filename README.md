@@ -50,9 +50,12 @@ cd mongodb-kafka-connector-example
 
 # Complete setup with sample data
 make dev-setup
+
+# Optional: Setup multiple filtered connectors for different operations
+make setup-multi-connectors
 ```
 
-**That's it!** 🎉 Your environment is ready.
+**That's it!** 🎉 Your environment is ready with filtered connectors for INSERT, UPDATE, DELETE operations.
 
 ### Manual Setup
 
@@ -88,6 +91,7 @@ After setup, access these services:
 - ✅ **MongoDB Replica Set** (3 nodes) - High availability
 - ✅ **Apache Kafka** with Zookeeper - Message streaming
 - ✅ **Kafka Connect** with MongoDB Source Connector
+- ✅ **Multiple Filtered Connectors** - Separate connectors for INSERT, UPDATE, DELETE operations
 - ✅ **Kafka UI** - Visual monitoring and management
 - ✅ **MongoDB Express** - Database administration
 - ✅ **Health Checks** - Automated service monitoring
@@ -102,23 +106,300 @@ After setup, access these services:
 - 🚨 **Error Handling**: Dead letter queues
 - 📖 **Documentation**: Comprehensive guides
 
+## ⚙️ Conectores Múltiplos com Filtros por Operação
+
+### 🎯 Visão Geral
+
+Este projeto agora inclui **conectores separados** para diferentes tipos de operação do MongoDB, permitindo que cada tipo de evento seja enviado para tópicos Kafka distintos:
+
+- **🟢 INSERT Connector**: Captura apenas operações de inserção → Tópico `mongo-insert.*`
+- **🟡 UPDATE Connector**: Captura apenas operações de atualização → Tópico `mongo-update.*`
+- **🔴 DELETE Connector**: Captura apenas operações de exclusão → Tópico `mongo-delete.*`
+
+### 📁 Estrutura dos Conectores
+
+```
+connectors/
+├── mongo-insert-connector.json   # Filtra apenas operações INSERT
+├── mongo-update-connector.json   # Filtra apenas operações UPDATE
+└── mongo-delete-connector.json   # Filtra apenas operações DELETE
+```
+
+### 🔧 Configuração dos Filtros
+
+Cada conector utiliza o **MongoDB Change Stream** com pipeline de agregação para filtrar por `operationType`:
+
+```json
+{
+  "name": "mongo-insert-connector",
+  "config": {
+    "connector.class": "com.mongodb.kafka.connect.MongoSourceConnector",
+    "pipeline": "[{\"$match\": {\"operationType\": \"insert\"}}]",
+    "topic.prefix": "mongo-insert",
+    "database": "exemplo",
+    ...
+  }
+}
+```
+
+**Tipos de operação disponíveis:**
+- `insert` - Inserção de novos documentos
+- `update` - Atualização de documentos existentes
+- `delete` - Exclusão de documentos
+- `replace` - Substituição completa de documentos
+
+### 🚀 Como Usar os Conectores Múltiplos
+
+#### Opção 1: Setup Completo (Recomendado para novos projetos)
+```bash
+# 1. Configuração inicial completa
+make dev-setup
+
+# 2. Configurar conectores múltiplos com filtros
+make setup-multi-connectors
+```
+
+#### Opção 2: Apenas Conectores Múltiplos (Para projetos existentes)
+```bash
+# Configurar apenas os conectores com filtros (requer ambiente já iniciado)
+make setup-multi-connectors
+```
+
+#### Opção 3: Manual
+```bash
+# Executar script diretamente
+./scripts/setup-multi-connectors.sh
+```
+
+### 📋 Tópicos Kafka Criados
+
+Após a configuração, os seguintes tópicos serão criados automaticamente:
+
+| Conector | Tópico de Exemplo | Descrição |
+|----------|------------------|-----------|
+| **INSERT** | `mongo-insert.exemplo.users` | Apenas inserções de usuários |
+| **UPDATE** | `mongo-update.exemplo.users` | Apenas atualizações de usuários |
+| **DELETE** | `mongo-delete.exemplo.users` | Apenas exclusões de usuários |
+| **INSERT** | `mongo-insert.exemplo.products` | Apenas inserções de produtos |
+| **UPDATE** | `mongo-update.exemplo.products` | Apenas atualizações de produtos |
+| **DELETE** | `mongo-delete.exemplo.products` | Apenas exclusões de produtos |
+
+### 📄 Exemplo de Mensagem Kafka
+
+**Mensagem de INSERT** (tópico: `mongo-insert.exemplo.users`):
+```json
+{
+  "_id": {
+    "_data": "82644F2A8D000000012B0429296E1404"
+  },
+  "operationType": "insert",
+  "clusterTime": {
+    "$timestamp": {
+      "t": 1682951293,
+      "i": 1
+    }
+  },
+  "ns": {
+    "db": "exemplo",
+    "coll": "users"
+  },
+  "documentKey": {
+    "_id": {
+      "$oid": "644f2a8d1234567890abcdef"
+    }
+  },
+  "fullDocument": {
+    "_id": {
+      "$oid": "644f2a8d1234567890abcdef"
+    },
+    "name": "João Silva",
+    "email": "joao@exemplo.com",
+    "createdAt": {
+      "$date": "2023-05-01T12:34:56.789Z"
+    }
+  }
+}
+```
+
+**Mensagem de UPDATE** (tópico: `mongo-update.exemplo.users`):
+```json
+{
+  "_id": {
+    "_data": "82644F2A8E000000012B0429296E1404"
+  },
+  "operationType": "update",
+  "clusterTime": {
+    "$timestamp": {
+      "t": 1682951294,
+      "i": 1
+    }
+  },
+  "ns": {
+    "db": "exemplo",
+    "coll": "users"
+  },
+  "documentKey": {
+    "_id": {
+      "$oid": "644f2a8d1234567890abcdef"
+    }
+  },
+  "updateDescription": {
+    "updatedFields": {
+      "status": "active",
+      "lastLogin": {
+        "$date": "2023-05-01T12:35:56.789Z"
+      }
+    },
+    "removedFields": []
+  },
+  "fullDocument": {
+    "_id": {
+      "$oid": "644f2a8d1234567890abcdef"
+    },
+    "name": "João Silva",
+    "email": "joao@exemplo.com",
+    "status": "active",
+    "lastLogin": {
+      "$date": "2023-05-01T12:35:56.789Z"
+    },
+    "createdAt": {
+      "$date": "2023-05-01T12:34:56.789Z"
+    }
+  }
+}
+```
+
+**Mensagem de DELETE** (tópico: `mongo-delete.exemplo.users`):
+```json
+{
+  "_id": {
+    "_data": "82644F2A8F000000012B0429296E1404"
+  },
+  "operationType": "delete",
+  "clusterTime": {
+    "$timestamp": {
+      "t": 1682951295,
+      "i": 1
+    }
+  },
+  "ns": {
+    "db": "exemplo",
+    "coll": "users"
+  },
+  "documentKey": {
+    "_id": {
+      "$oid": "644f2a8d1234567890abcdef"
+    }
+  }
+}
+```
+
+### 🧪 Testando os Filtros
+
+1. **Inicie o ambiente**:
+   ```bash
+   make dev-setup
+   make setup-multi-connectors
+   ```
+
+2. **Insira dados de teste**:
+   ```bash
+   make sample-data
+   ```
+
+3. **Monitore os tópicos** em tempo real:
+   ```bash
+   # Opção 1: Via interface web (Recomendado)
+   # Acesse http://localhost:8080 e visualize os tópicos
+   
+   # Opção 2: Via linha de comando
+   make monitor-topics
+   ```
+
+4. **Teste operações específicas**:
+   ```bash
+   # Conectar ao MongoDB e fazer operações manuais
+   docker-compose exec mongo1 mongosh "mongodb://admin:password123@localhost:27017/exemplo?authSource=admin"
+   
+   # Inserir documento (aparecerá em mongo-insert.exemplo.*)
+   db.users.insertOne({name: "Teste Insert", email: "insert@test.com"})
+   
+   # Atualizar documento (aparecerá em mongo-update.exemplo.*)
+   db.users.updateOne({name: "Teste Insert"}, {$set: {status: "updated"}})
+   
+   # Excluir documento (aparecerá em mongo-delete.exemplo.*)
+   db.users.deleteOne({name: "Teste Insert"})
+   ```
+
+### 🔍 Monitoramento e Verificação
+
+#### Via Kafka UI (Interface Web)
+- **URL**: http://localhost:8080
+- Visualize mensagens em tempo real
+- Analise configuração dos conectores
+- Monitore performance e métricas
+
+#### Via API do Kafka Connect
+```bash
+# Status de todos os conectores
+curl -s http://localhost:8083/connectors | jq
+
+# Status específico do conector INSERT
+curl -s http://localhost:8083/connectors/mongo-insert-connector/status | jq
+
+# Status específico do conector UPDATE
+curl -s http://localhost:8083/connectors/mongo-update-connector/status | jq
+
+# Status específico do conector DELETE
+curl -s http://localhost:8083/connectors/mongo-delete-connector/status | jq
+```
+
+### ⚠️ Observações Importantes
+
+1. **Change Streams**: Requer MongoDB em modo Replica Set (já configurado neste projeto)
+2. **Performance**: Conectores múltiplos consomem mais recursos - monitore o uso
+3. **Dead Letter Queues**: Cada conector tem sua própria DLQ para tratamento de erros
+4. **Tópicos**: Os tópicos são criados automaticamente quando as primeiras mensagens chegam
+
+### 🎛️ Personalização dos Conectores
+
+Para personalizar os conectores, edite os arquivos JSON em `connectors/`:
+
+```bash
+# Editar configuração do conector INSERT
+nano connectors/mongo-insert-connector.json
+
+# Aplicar mudanças (requer reinicialização do conector)
+make setup-multi-connectors
+```
+
+**Configurações que podem ser personalizadas:**
+- Database e collections específicas
+- Filtros mais complexos no pipeline
+- Configurações de performance (batch size, poll intervals)
+- Tópicos de destino
+- Formatação das mensagens
+
 ## 🛠️ Available Commands
 
 ```bash
 # Essential commands
-make help          # Show all available commands
-make status        # Check service health
-make logs          # View all service logs
+make help                    # Show all available commands
+make status                  # Check service health
+make logs                    # View all service logs
 
 # Development
-make dev-setup     # Complete development setup
-make sample-data   # Insert test data
-make monitor-topics # Watch Kafka messages
+make dev-setup              # Complete development setup
+make sample-data            # Insert test data
+make monitor-topics         # Watch Kafka messages
+
+# Connector Management
+make setup-multi-connectors # Setup multiple filtered connectors (INSERT, UPDATE, DELETE)
 
 # Management
-make clean         # Clean up everything
-make backup        # Backup MongoDB data
-make restart-*     # Restart specific services
+make clean                  # Clean up everything
+make backup                 # Backup MongoDB data
+make restart-*              # Restart specific services
 ```
 
 ## 📝 Configuration
