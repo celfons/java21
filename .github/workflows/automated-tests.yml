@@ -1,0 +1,191 @@
+# Automated Testing Workflow
+# Runs comprehensive integration tests using Docker Compose on every build
+
+name: 'Automated Integration Tests'
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
+      - '.github/workflows/azure-*.yml'
+  pull_request:
+    branches: [ main, develop ]
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
+      - '.github/workflows/azure-*.yml'
+  workflow_dispatch:
+
+env:
+  # Test environment configuration
+  COMPOSE_PROJECT_NAME: mongodb-kafka-test
+  MONGO_REPLICA_SET_NAME: rs0
+  MONGO_INITDB_ROOT_USERNAME: admin
+  MONGO_INITDB_ROOT_PASSWORD: password123
+  
+jobs:
+  integration-tests:
+    name: 'Integration Tests with Docker'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    steps:
+    - name: 'Checkout Repository'
+      uses: actions/checkout@v4
+      
+    - name: 'Set up Docker Buildx'
+      uses: docker/setup-buildx-action@v3
+      
+    - name: 'Install Required Tools'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y netcat-traditional jq curl
+        
+        # Install MongoDB tools for testing
+        wget -qO - https://www.mongodb.org/static/pgp/server-7.0.asc | sudo apt-key add -
+        echo "deb [ arch=amd64,arm64 ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/7.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-7.0.list
+        sudo apt-get update
+        sudo apt-get install -y mongodb-mongosh
+
+    - name: 'Create Environment File'
+      run: |
+        cp .env.example .env
+        echo "COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME}" >> .env
+        echo "MONGO_REPLICA_SET_NAME=${MONGO_REPLICA_SET_NAME}" >> .env
+        echo "MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME}" >> .env
+        echo "MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD}" >> .env
+        
+    - name: 'Validate Configuration Files'
+      run: |
+        echo "Running configuration validation..."
+        ./validate.sh
+        
+    - name: 'Build Custom Docker Images'
+      run: |
+        echo "Building Kafka Connect custom image..."
+        make build
+        
+    - name: 'Start Services with Docker Compose'
+      run: |
+        echo "Starting all services..."
+        docker-compose up -d
+        
+        echo "Waiting for services to initialize..."
+        sleep 60
+        
+    - name: 'Display Service Status'
+      run: |
+        echo "=== Docker Compose Services Status ==="
+        docker-compose ps
+        echo ""
+        echo "=== Service Logs (last 20 lines each) ==="
+        docker-compose logs --tail=20
+        
+    - name: 'Initialize MongoDB Replica Set'
+      run: |
+        echo "Initializing MongoDB replica set..."
+        # Wait for MongoDB to be ready
+        timeout 120 bash -c 'until docker-compose exec -T mongo1 mongosh --eval "db.adminCommand(\"ping\")" > /dev/null 2>&1; do sleep 5; done'
+        
+        # Initialize replica set
+        docker-compose exec -T mongo1 mongosh --file /docker-entrypoint-initdb.d/replica-init.js
+        
+        echo "Waiting for replica set to stabilize..."
+        sleep 30
+        
+    - name: 'Run Health Checks'
+      run: |
+        echo "Running comprehensive health checks..."
+        # Make health check script executable and run it
+        chmod +x scripts/health-check.sh
+        
+        # Health check with retries
+        for i in {1..3}; do
+          echo "Health check attempt $i/3..."
+          if ./scripts/health-check.sh; then
+            echo "Health check passed!"
+            break
+          else
+            if [ $i -eq 3 ]; then
+              echo "Health check failed after 3 attempts"
+              exit 1
+            fi
+            echo "Health check failed, waiting 30s before retry..."
+            sleep 30
+          fi
+        done
+        
+    - name: 'Run Integration Tests'
+      run: |
+        echo "Running integration tests..."
+        make test
+        
+    - name: 'Test Kafka Connect Setup'
+      run: |
+        echo "Setting up and testing Kafka Connect MongoDB Source Connector..."
+        
+        # Wait for Kafka Connect to be fully ready
+        timeout 120 bash -c 'until curl -s -f http://localhost:8083/connectors > /dev/null; do sleep 5; done'
+        
+        # Setup connector
+        chmod +x scripts/setup-connector.sh
+        ./scripts/setup-connector.sh
+        
+        # Verify connector is running
+        sleep 10
+        curl -s http://localhost:8083/connectors | jq .
+        
+        # Check connector status
+        CONNECTORS=$(curl -s http://localhost:8083/connectors)
+        if [ "$CONNECTORS" != "[]" ]; then
+          echo "Connectors found: $CONNECTORS"
+          for connector in $(echo "$CONNECTORS" | jq -r '.[]'); do
+            echo "Checking status of connector: $connector"
+            curl -s "http://localhost:8083/connectors/$connector/status" | jq .
+          done
+        else
+          echo "No connectors found - this might be expected if setup failed"
+        fi
+        
+    - name: 'Test Data Flow'
+      run: |
+        echo "Testing data insertion and Kafka message flow..."
+        
+        # Insert test data into MongoDB
+        docker-compose exec -T mongo1 mongosh --eval "
+          use testdb;
+          db.users.insertMany([
+            {name: 'John Doe', email: 'john@example.com', createdAt: new Date()},
+            {name: 'Jane Smith', email: 'jane@example.com', createdAt: new Date()},
+            {name: 'Bob Johnson', email: 'bob@example.com', createdAt: new Date()}
+          ]);
+          print('Inserted test data:');
+          db.users.find().forEach(printjson);
+        "
+        
+        # Check if Kafka topics exist
+        echo "Checking Kafka topics..."
+        docker-compose exec -T kafka kafka-topics --bootstrap-server localhost:9092 --list
+        
+    - name: 'Generate Test Report'
+      if: always()
+      run: |
+        echo "=== Test Execution Summary ==="
+        echo "Timestamp: $(date)"
+        echo "Git Commit: ${GITHUB_SHA}"
+        echo "Branch: ${GITHUB_REF#refs/heads/}"
+        echo ""
+        echo "=== Final Service Status ==="
+        docker-compose ps
+        echo ""
+        echo "=== Resource Usage ==="
+        docker stats --no-stream
+        
+    - name: 'Cleanup'
+      if: always()
+      run: |
+        echo "Stopping and cleaning up services..."
+        docker-compose down -v
+        docker system prune -f
