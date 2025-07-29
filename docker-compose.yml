@@ -3,7 +3,7 @@ version: '3.8'
 services:
   # MongoDB Replica Set - Primary
   mongo1:
-    image: mongo:7.0
+    image: mongo:latest
     container_name: mongo1
     restart: unless-stopped
     command: mongod --replSet ${MONGO_REPLICA_SET_NAME:-rs0} --bind_ip_all --port 27017
@@ -27,7 +27,7 @@ services:
 
   # MongoDB Replica Set - Secondary 1
   mongo2:
-    image: mongo:7.0
+    image: mongo:latest
     container_name: mongo2
     restart: unless-stopped
     command: mongod --replSet ${MONGO_REPLICA_SET_NAME:-rs0} --bind_ip_all --port 27017
@@ -52,7 +52,7 @@ services:
 
   # MongoDB Replica Set - Secondary 2
   mongo3:
-    image: mongo:7.0
+    image: mongo:latest
     container_name: mongo3
     restart: unless-stopped
     command: mongod --replSet ${MONGO_REPLICA_SET_NAME:-rs0} --bind_ip_all --port 27017
