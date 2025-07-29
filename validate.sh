@@ -125,9 +125,13 @@ validate_structure() {
         "config/kafka-connect/mongodb-source-connector.json"
         "config/kafka-connect/connect-log4j.properties"
         "config/mongodb/replica-init.js"
+        "connectors/mongo-insert-connector.json"
+        "connectors/mongo-update-connector.json"
+        "connectors/mongo-delete-connector.json"
         "scripts/health-check.sh"
         "scripts/init-replica.sh"
         "scripts/setup-connector.sh"
+        "scripts/setup-multi-connectors.sh"
         "scripts/sample-data.js"
         "docs/SETUP.md"
         "docs/ATLAS_SETUP.md"
@@ -155,6 +159,9 @@ validate_configs() {
     # Validate JSON files
     local json_files=(
         "config/kafka-connect/mongodb-source-connector.json"
+        "connectors/mongo-insert-connector.json"
+        "connectors/mongo-update-connector.json"
+        "connectors/mongo-delete-connector.json"
     )
     
     for file in "${json_files[@]}"; do
@@ -181,6 +188,7 @@ validate_scripts() {
         "scripts/health-check.sh"
         "scripts/init-replica.sh"
         "scripts/setup-connector.sh"
+        "scripts/setup-multi-connectors.sh"
     )
     
     for script in "${scripts[@]}"; do
