@@ -1,4 +1,4 @@
-.PHONY: help build up down setup logs status clean test sample-data
+.PHONY: help build up down setup logs status clean test sample-data azure-env azure-build azure-test-local azure-logs azure-stop azure-validate
 
 # Default target
 help: ## Show this help message
@@ -170,3 +170,37 @@ update-connector: ## Update connector configuration
 show-env: ## Show current environment configuration
 	@echo "Current environment configuration:"
 	@cat .env 2>/dev/null || echo "No .env file found. Run 'make .env' to create one."
+
+# Azure deployment helpers
+azure-env: ## Create Azure environment template
+	@if [ ! -f .env.azure ]; then \
+		echo "Creating .env.azure from template..."; \
+		cp .env.azure.example .env.azure; \
+		echo "⚠️  Please edit .env.azure with your Azure credentials"; \
+		echo "⚠️  Do NOT commit .env.azure to version control"; \
+	else \
+		echo ".env.azure already exists"; \
+	fi
+
+azure-build: ## Build image for Azure deployment
+	@echo "Building Azure production image..."
+	docker build -t kafka-connect-mongodb:azure .
+
+azure-test-local: azure-env azure-build ## Test Azure configuration locally
+	@echo "Testing Azure configuration locally..."
+	@if [ ! -f .env.azure ]; then \
+		echo "❌ .env.azure not found. Run 'make azure-env' first"; \
+		exit 1; \
+	fi
+	docker-compose -f docker-compose.azure.yml --env-file .env.azure up -d
+	@echo "🚀 Azure configuration running locally"
+	@echo "🔗 API: http://localhost:8083"
+
+azure-logs: ## Show logs for Azure local test
+	docker-compose -f docker-compose.azure.yml logs -f
+
+azure-stop: ## Stop Azure local test
+	docker-compose -f docker-compose.azure.yml down
+
+azure-validate: ## Validate Azure deployment configuration
+	@./scripts/validate-azure.sh

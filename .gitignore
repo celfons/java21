@@ -1,5 +1,9 @@
 # Environment files
 .env
+.env.azure
+.env.local
+.env.production
+.env.staging
 
 # Docker volumes and data
 mongo1_data/

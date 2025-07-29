@@ -178,15 +178,106 @@ The MongoDB Source Connector is configured in `config/kafka-connect/mongodb-sour
 
 ## 🏭 Production Deployment
 
-For production environments:
+### Azure Cloud Deployment (Automatizado) 🚀
 
-1. **Security**: Configure authentication and TLS
-2. **Scaling**: Increase replica set and Kafka partitions
-3. **Monitoring**: Set up logging and alerting
-4. **Networking**: Configure proper network security
-5. **Backup**: Implement automated backup strategies
+Este projeto inclui uma esteira de CI/CD completa para deploy automatizado no Azure:
 
-See [Production Setup Guide](docs/SETUP.md#production-deployment) for details.
+- ✅ **Build e Push automatizado** para Azure Container Registry (ACR)
+- ✅ **Deploy para Azure Web App for Containers** ou Azure Container Instances
+- ✅ **Configuração automática** de variáveis de ambiente
+- ✅ **Integração com MongoDB Atlas** para produção
+- ✅ **Verificação de saúde** automática da aplicação
+
+#### 🔧 Configuração Rápida
+
+1. **Configure os Secrets no GitHub** (obrigatório):
+   ```bash
+   # Azure Container Registry
+   ACR_REGISTRY=<seu-registry>.azurecr.io
+   ACR_USERNAME=<username-do-acr>
+   ACR_PASSWORD=<password-do-acr>
+   
+   # Azure Web App
+   AZURE_WEBAPP_NAME=<nome-do-web-app>
+   AZURE_RESOURCE_GROUP=<nome-do-resource-group>
+   
+   # Credenciais Azure (JSON do service principal)
+   AZURE_CREDENTIALS=<json-das-credenciais>
+   
+   # MongoDB Atlas produtivo
+   MONGODB_ATLAS_CONNECTION_STRING=mongodb+srv://<user>:<pass>@<cluster>.mongodb.net/<db>
+   ```
+
+2. **Deploy Automático**:
+   - Push na branch `main` → Deploy automático para produção
+   - Dispatch manual → Deploy para staging/development
+
+3. **Acesso à Aplicação**:
+   - **URL**: `https://<webapp-name>.azurewebsites.net:8083`
+   - **API Connectors**: `/connectors`
+   - **Health Check**: `/connector-plugins`
+
+#### 📚 Documentação Completa
+
+Veja a [documentação completa do CI/CD](.github/workflows/README.md) para:
+- Configuração detalhada dos secrets
+- Como obter credenciais Azure
+- Troubleshooting e solução de problemas
+- Customização da pipeline
+
+#### 🔐 Exemplos de Configuração dos Secrets
+
+**Como configurar os secrets no GitHub:**
+
+1. Acesse `Settings` → `Secrets and variables` → `Actions` no seu repositório
+2. Clique em `New repository secret` para cada um:
+
+```bash
+# Exemplo de AZURE_CREDENTIALS (JSON do service principal):
+{
+  "clientId": "12345678-1234-1234-1234-123456789012",
+  "clientSecret": "sua-secret-key-aqui",
+  "subscriptionId": "87654321-4321-4321-4321-210987654321",
+  "tenantId": "11111111-2222-3333-4444-555555555555"
+}
+
+# Exemplo de ACR_REGISTRY:
+meuregistry.azurecr.io
+
+# Exemplo de MONGODB_ATLAS_CONNECTION_STRING:
+mongodb+srv://admin:password123@cluster0.abcde.mongodb.net/producao?retryWrites=true&w=majority
+```
+
+**Como obter as credenciais Azure:**
+```bash
+# 1. Login no Azure CLI
+az login
+
+# 2. Criar service principal
+az ad sp create-for-rbac \
+  --name "mongodb-kafka-cd" \
+  --role contributor \
+  --scopes /subscriptions/YOUR_SUBSCRIPTION_ID \
+  --sdk-auth
+
+# 3. Habilitar admin no ACR
+az acr update --name SEU_REGISTRY --admin-enabled true
+
+# 4. Obter credenciais do ACR
+az acr credential show --name SEU_REGISTRY
+```
+
+### Deployment Tradicional
+
+Para ambientes on-premise ou outras clouds:
+
+1. **Security**: Configure authentication e TLS
+2. **Scaling**: Aumente replica set e partições do Kafka
+3. **Monitoring**: Configure logs e alertas
+4. **Networking**: Configure segurança de rede adequada
+5. **Backup**: Implemente estratégias de backup automatizado
+
+Veja o [Guia de Setup para Produção](docs/SETUP.md#production-deployment) para detalhes.
 
 ## 🤝 Contributing
 
