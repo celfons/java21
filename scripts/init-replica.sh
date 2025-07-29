@@ -79,7 +79,12 @@ main() {
     
     # Verificar dependências
     check_command "docker"
-    check_command "docker-compose"
+    
+    # Verificar docker compose (v2) ou docker-compose (v1)
+    if ! docker compose version &> /dev/null && ! docker-compose --version &> /dev/null; then
+        log ERROR "Docker Compose não encontrado. Instale Docker Compose v2 ou v1."
+        exit 1
+    fi
     
     # Navegar para o diretório do projeto
     cd "$PROJECT_DIR"
@@ -98,35 +103,35 @@ main() {
     # Verificar se os containers MongoDB estão rodando
     log INFO "Verificando status dos containers MongoDB..."
     
-    if ! docker-compose ps mongo-primary | grep -q "Up"; then
+    if ! docker compose ps mongo-primary | grep -q "Up"; then
         log INFO "Iniciando containers MongoDB..."
-        docker-compose up -d mongo-primary mongo-secondary-1 mongo-secondary-2
+        docker compose up -d mongo-primary mongo-secondary-1 mongo-secondary-2
     else
         log INFO "Containers MongoDB já estão rodando"
     fi
     
     # Aguardar MongoDB primary estar pronto
     wait_for_service "MongoDB Primary" \
-        "docker-compose exec -T mongo-primary mongosh --eval 'db.adminCommand({ping: 1})'"
+        "docker compose exec -T mongo-primary mongosh --eval 'db.adminCommand({ping: 1})'"
     
     # Aguardar MongoDB secondary nodes estarem prontos
     wait_for_service "MongoDB Secondary 1" \
-        "docker-compose exec -T mongo-secondary-1 mongosh --eval 'db.adminCommand({ping: 1})'"
+        "docker compose exec -T mongo-secondary-1 mongosh --eval 'db.adminCommand({ping: 1})'"
     
     wait_for_service "MongoDB Secondary 2" \
-        "docker-compose exec -T mongo-secondary-2 mongosh --eval 'db.adminCommand({ping: 1})'"
+        "docker compose exec -T mongo-secondary-2 mongosh --eval 'db.adminCommand({ping: 1})'"
     
     # Verificar se o replica set já foi inicializado
     log INFO "Verificando status do Replica Set..."
     
-    if docker-compose exec -T mongo-primary mongosh --eval 'rs.status()' &> /dev/null; then
+    if docker compose exec -T mongo-primary mongosh --eval 'rs.status()' &> /dev/null; then
         log WARN "Replica Set já foi inicializado. Verificando configuração..."
-        docker-compose exec -T mongo-primary mongosh --eval 'rs.status()'
+        docker compose exec -T mongo-primary mongosh --eval 'rs.status()'
     else
         log INFO "Inicializando Replica Set..."
         
         # Executar script de inicialização
-        docker-compose exec -T mongo-primary mongosh --file /docker-entrypoint-initdb.d/replica-init.js
+        docker compose exec -T mongo-primary mongosh --file /docker-entrypoint-initdb.d/replica-init.js
         
         if [ $? -eq 0 ]; then
             log INFO "Replica Set inicializado com sucesso!"
@@ -141,7 +146,7 @@ main() {
     
     sleep 10  # Aguardar estabilização
     
-    if docker-compose exec -T mongo-primary mongosh --eval '
+    if docker compose exec -T mongo-primary mongosh --eval '
         const status = rs.status();
         const primary = status.members.find(m => m.stateStr === "PRIMARY");
         const secondaries = status.members.filter(m => m.stateStr === "SECONDARY");
@@ -162,7 +167,7 @@ main() {
     
     # Exibir informações do replica set
     log INFO "=== Informações do Replica Set ==="
-    docker-compose exec -T mongo-primary mongosh --eval '
+    docker compose exec -T mongo-primary mongosh --eval '
         const status = rs.status();
         status.members.forEach(member => {
             print(`Membro: ${member.name} - Estado: ${member.stateStr} - Saúde: ${member.health}`);

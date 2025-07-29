@@ -6,6 +6,7 @@
 COMPOSE_FILE = docker-compose.yml
 ENV_FILE = .env
 PROJECT_NAME = mongodb-kafka-example
+DOCKER_COMPOSE = $(shell if command -v docker-compose >/dev/null 2>&1; then echo "docker-compose"; else echo "docker compose"; fi)
 
 # Cores para output
 GREEN = \033[0;32m
@@ -81,24 +82,24 @@ setup: check-env
 # Build das imagens Docker
 build: check-env
 	@echo "$(YELLOW)Construindo imagens Docker...$(NC)"
-	@docker-compose -f $(COMPOSE_FILE) build
+	@$(DOCKER_COMPOSE) -f $(COMPOSE_FILE) build
 
 # Rebuild completo
 rebuild: check-env
 	@echo "$(YELLOW)Reconstruindo imagens Docker (sem cache)...$(NC)"
-	@docker-compose -f $(COMPOSE_FILE) build --no-cache
+	@$(DOCKER_COMPOSE) -f $(COMPOSE_FILE) build --no-cache
 
 # Iniciar serviços
 up: check-env
 	@echo "$(YELLOW)Iniciando serviços...$(NC)"
-	@docker-compose -f $(COMPOSE_FILE) up -d
+	@$(DOCKER_COMPOSE) -f $(COMPOSE_FILE) up -d
 	@echo "$(GREEN)Serviços iniciados!$(NC)"
 	@$(MAKE) status
 
 # Parar serviços
 down:
 	@echo "$(YELLOW)Parando serviços...$(NC)"
-	@docker-compose -f $(COMPOSE_FILE) down
+	@$(DOCKER_COMPOSE) -f $(COMPOSE_FILE) down
 	@echo "$(GREEN)Serviços parados!$(NC)"
 
 # Reiniciar serviços
@@ -121,33 +122,33 @@ setup-connector:
 # Inserir dados de exemplo
 sample-data:
 	@echo "$(YELLOW)Inserindo dados de exemplo...$(NC)"
-	@docker-compose exec -T mongo-primary mongosh mongodb://admin:password123@localhost:27017/inventory?authSource=admin --file /dev/stdin < scripts/sample-data.js
+	@$(DOCKER_COMPOSE) exec -T mongo-primary mongosh mongodb://admin:password123@localhost:27017/inventory?authSource=admin --file /dev/stdin < scripts/sample-data.js
 
 # Visualizar logs
 logs:
-	@docker-compose -f $(COMPOSE_FILE) logs --tail=100
+	@$(DOCKER_COMPOSE) -f $(COMPOSE_FILE) logs --tail=100
 
 # Seguir logs em tempo real
 logs-follow:
-	@docker-compose -f $(COMPOSE_FILE) logs -f
+	@$(DOCKER_COMPOSE) -f $(COMPOSE_FILE) logs -f
 
 # Logs de um serviço específico
 logs-mongo:
-	@docker-compose -f $(COMPOSE_FILE) logs mongo-primary mongo-secondary-1 mongo-secondary-2
+	@$(DOCKER_COMPOSE) -f $(COMPOSE_FILE) logs mongo-primary mongo-secondary-1 mongo-secondary-2
 
 logs-kafka:
-	@docker-compose -f $(COMPOSE_FILE) logs kafka zookeeper
+	@$(DOCKER_COMPOSE) -f $(COMPOSE_FILE) logs kafka zookeeper
 
 logs-connect:
-	@docker-compose -f $(COMPOSE_FILE) logs kafka-connect
+	@$(DOCKER_COMPOSE) -f $(COMPOSE_FILE) logs kafka-connect
 
 logs-ui:
-	@docker-compose -f $(COMPOSE_FILE) logs kafka-ui mongo-express
+	@$(DOCKER_COMPOSE) -f $(COMPOSE_FILE) logs kafka-ui mongo-express
 
 # Status dos containers
 status:
 	@echo "$(YELLOW)Status dos containers:$(NC)"
-	@docker-compose -f $(COMPOSE_FILE) ps
+	@$(DOCKER_COMPOSE) -f $(COMPOSE_FILE) ps
 
 # Verificação de saúde
 health:
@@ -162,7 +163,7 @@ health-detailed:
 # Limpeza básica
 clean:
 	@echo "$(YELLOW)Limpando containers parados e imagens não utilizadas...$(NC)"
-	@docker-compose -f $(COMPOSE_FILE) down --remove-orphans
+	@$(DOCKER_COMPOSE) -f $(COMPOSE_FILE) down --remove-orphans
 	@docker system prune -f
 	@echo "$(GREEN)Limpeza concluída!$(NC)"
 
@@ -171,7 +172,7 @@ clean-all:
 	@echo "$(RED)ATENÇÃO: Esta operação removerá TODOS os dados!$(NC)"
 	@read -p "Tem certeza? Digite 'yes' para continuar: " confirm && [ "$$confirm" = "yes" ] || exit 1
 	@echo "$(YELLOW)Removendo todos os containers, volumes e imagens...$(NC)"
-	@docker-compose -f $(COMPOSE_FILE) down --volumes --remove-orphans
+	@$(DOCKER_COMPOSE) -f $(COMPOSE_FILE) down --volumes --remove-orphans
 	@docker volume prune -f
 	@docker image prune -a -f
 	@echo "$(GREEN)Limpeza completa concluída!$(NC)"
@@ -179,10 +180,10 @@ clean-all:
 # Comandos de desenvolvimento
 dev-up:
 	@echo "$(YELLOW)Iniciando ambiente de desenvolvimento...$(NC)"
-	@docker-compose -f $(COMPOSE_FILE) up
+	@$(DOCKER_COMPOSE) -f $(COMPOSE_FILE) up
 
 dev-logs:
-	@docker-compose -f $(COMPOSE_FILE) logs -f kafka-connect mongo-primary
+	@$(DOCKER_COMPOSE) -f $(COMPOSE_FILE) logs -f kafka-connect mongo-primary
 
 # Comandos de teste
 test-connection:
@@ -194,11 +195,11 @@ test-connection:
 # Comandos úteis para debugging
 debug-mongo:
 	@echo "$(YELLOW)Acessando MongoDB Primary...$(NC)"
-	@docker-compose exec mongo-primary mongosh mongodb://admin:password123@localhost:27017/?authSource=admin
+	@$(DOCKER_COMPOSE) exec mongo-primary mongosh mongodb://admin:password123@localhost:27017/?authSource=admin
 
 debug-kafka:
 	@echo "$(YELLOW)Listando tópicos Kafka...$(NC)"
-	@docker-compose exec kafka kafka-topics --bootstrap-server localhost:9092 --list
+	@$(DOCKER_COMPOSE) exec kafka kafka-topics --bootstrap-server localhost:9092 --list
 
 debug-connect:
 	@echo "$(YELLOW)Status dos conectores...$(NC)"
@@ -208,7 +209,7 @@ debug-connect:
 backup:
 	@echo "$(YELLOW)Criando backup dos dados MongoDB...$(NC)"
 	@mkdir -p backups
-	@docker-compose exec -T mongo-primary mongodump --uri="mongodb://admin:password123@localhost:27017/?authSource=admin" --archive --gzip > backups/mongodb-backup-$(shell date +%Y%m%d-%H%M%S).gz
+	@$(DOCKER_COMPOSE) exec -T mongo-primary mongodump --uri="mongodb://admin:password123@localhost:27017/?authSource=admin" --archive --gzip > backups/mongodb-backup-$(shell date +%Y%m%d-%H%M%S).gz
 	@echo "$(GREEN)Backup criado em backups/$(NC)"
 
 # Restaurar backup
@@ -218,7 +219,7 @@ restore:
 	@read -p "Digite o nome do arquivo de backup: " backup_file; \
 	if [ -f "backups/$$backup_file" ]; then \
 		echo "$(YELLOW)Restaurando backup $$backup_file...$(NC)"; \
-		docker-compose exec -T mongo-primary mongorestore --uri="mongodb://admin:password123@localhost:27017/?authSource=admin" --archive --gzip < "backups/$$backup_file"; \
+		$(DOCKER_COMPOSE) exec -T mongo-primary mongorestore --uri="mongodb://admin:password123@localhost:27017/?authSource=admin" --archive --gzip < "backups/$$backup_file"; \
 		echo "$(GREEN)Backup restaurado!$(NC)"; \
 	else \
 		echo "$(RED)Arquivo de backup não encontrado!$(NC)"; \
@@ -232,7 +233,7 @@ info:
 	@echo "$(YELLOW)Env File:$(NC) $(ENV_FILE)"
 	@echo ""
 	@echo "$(YELLOW)Containers ativos:$(NC)"
-	@docker-compose ps --format "table {{.Name}}\t{{.State}}\t{{.Ports}}"
+	@$(DOCKER_COMPOSE) ps --format "table {{.Name}}\t{{.State}}\t{{.Ports}}"
 	@echo ""
 	@echo "$(YELLOW)Volumes:$(NC)"
 	@docker volume ls --format "table {{.Name}}\t{{.Driver}}" | grep $(PROJECT_NAME) || echo "Nenhum volume encontrado"

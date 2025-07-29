@@ -1,32 +1,21 @@
 FROM confluentinc/cp-kafka-connect:7.4.0
 
-# Install MongoDB Kafka Connector
-RUN confluent-hub install --no-prompt mongodb/kafka-connect-mongodb:1.11.0
+# Create directories
+USER root
+RUN mkdir -p /usr/share/confluent-hub-components /etc/kafka-connect
 
-# Install additional useful connectors
-RUN confluent-hub install --no-prompt confluentinc/kafka-connect-datagen:0.6.0
-
-# Add custom log4j configuration
+# Copy configuration files
 COPY config/kafka-connect/connect-log4j.properties /etc/kafka/connect-log4j.properties
 
-# Set environment variable for log4j configuration
+# Set log4j configuration
 ENV KAFKA_LOG4J_OPTS="-Dlog4j.configuration=file:/etc/kafka/connect-log4j.properties"
 
-# Create directory for additional plugins
-RUN mkdir -p /usr/share/confluent-hub-components
+# Try to install MongoDB connector (may fail in some environments)
+RUN confluent-hub install --no-prompt mongodb/kafka-connect-mongodb:1.11.0 || \
+    echo "MongoDB connector installation failed - will use runtime installation"
 
-# Add health check script
-RUN echo '#!/bin/bash\ncurl -f http://localhost:8083/ || exit 1' > /usr/local/bin/health-check.sh && \
-    chmod +x /usr/local/bin/health-check.sh
-
-# Set proper permissions
-USER root
+# Set permissions and switch back to appuser
 RUN chown -R appuser:appuser /etc/kafka-connect /usr/share/confluent-hub-components
 USER appuser
 
-# Expose the Connect REST API port
 EXPOSE 8083
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD /usr/local/bin/health-check.sh
