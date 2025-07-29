@@ -84,6 +84,139 @@ After setup, access these services:
 - MongoDB Express: `admin` / `admin`
 - MongoDB: `admin` / `password123`
 
+## 🧪 Automated Testing
+
+### CI/CD Integration Tests
+
+This project includes comprehensive **automated integration tests** that run on every build using GitHub Actions. The tests ensure all components work together correctly in a containerized environment.
+
+#### 🔄 What Gets Tested
+
+The automated test suite validates:
+
+- ✅ **Service Health**: All Docker containers start and respond correctly
+- ✅ **MongoDB Replica Set**: Proper initialization and cluster communication  
+- ✅ **Kafka Ecosystem**: Broker, Zookeeper, and Connect API functionality
+- ✅ **Connector Setup**: MongoDB Source Connector configuration and status
+- ✅ **Data Flow**: End-to-end data insertion and message streaming
+- ✅ **Configuration Validation**: Docker Compose, JSON configs, and scripts
+
+#### 🚀 Automated Test Execution
+
+Tests run automatically on:
+- **Push to main/develop branches**
+- **Pull requests**
+- **Manual workflow dispatch**
+
+View test results in the [GitHub Actions tab](../../actions/workflows/automated-tests.yml).
+
+#### 🖥️ Running Tests Locally
+
+##### Option 1: Quick Test (Recommended)
+```bash
+# Run the full test suite locally
+make test
+```
+
+##### Option 2: Complete Integration Test
+```bash
+# 1. Clean environment
+make down
+
+# 2. Run full validation
+./validate.sh
+
+# 3. Complete setup with testing
+make setup
+
+# 4. Run health checks
+./scripts/health-check.sh
+
+# 5. Verify connector setup
+curl http://localhost:8083/connectors | jq .
+```
+
+##### Option 3: Manual Step-by-Step Testing
+```bash
+# 1. Start services
+docker compose up -d
+
+# 2. Wait for initialization (important!)
+sleep 60
+
+# 3. Initialize MongoDB replica set
+docker compose exec -T mongo1 mongosh --file /docker-entrypoint-initdb.d/replica-init.js
+
+# 4. Setup Kafka Connect MongoDB Source Connector
+./scripts/setup-connector.sh
+
+# 5. Run comprehensive health checks
+./scripts/health-check.sh
+
+# 6. Test data insertion
+docker compose exec -T mongo1 mongosh --eval "
+  use testdb;
+  db.users.insertOne({name: 'Test User', email: 'test@example.com'});
+  db.users.find().forEach(printjson);
+"
+
+# 7. Check Kafka topics for messages
+docker compose exec -T kafka kafka-topics --bootstrap-server localhost:9092 --list
+```
+
+#### 🔧 Test Configuration
+
+The automated tests use environment variables that can be customized:
+
+```bash
+# Test environment settings (in .env file)
+COMPOSE_PROJECT_NAME=mongodb-kafka-test
+MONGO_REPLICA_SET_NAME=rs0
+MONGO_INITDB_ROOT_USERNAME=admin
+MONGO_INITDB_ROOT_PASSWORD=password123
+```
+
+#### ⚠️ Prerequisites for Local Testing
+
+Ensure you have installed:
+- Docker 20.0+ and Docker Compose
+- `curl`, `jq`, `netcat` utilities
+- MongoDB shell (`mongosh`) for database operations
+
+#### 🐛 Troubleshooting Tests
+
+**Common issues and solutions:**
+
+```bash
+# If tests fail due to timing issues
+# Increase wait times and retry
+
+# Check service logs
+docker compose logs [service-name]
+
+# Manual health check individual services
+curl http://localhost:8083/connectors        # Kafka Connect
+curl http://localhost:8080                   # Kafka UI
+mongosh --host localhost:27017 --eval "db.adminCommand('ping')"  # MongoDB
+
+# Clean restart
+docker compose down -v && docker compose up -d
+```
+
+**Test timeout issues:**
+- MongoDB replica set initialization can take up to 2 minutes
+- Kafka Connect startup requires additional time for plugin loading
+- Network connectivity between containers needs stabilization time
+
+#### 📊 Test Reports
+
+The GitHub Actions workflow generates comprehensive test reports including:
+- Service startup logs and status
+- Health check results for all components
+- Connector configuration and status
+- Resource usage statistics
+- Error details and troubleshooting information
+
 ## 📊 Features
 
 ### Core Components
