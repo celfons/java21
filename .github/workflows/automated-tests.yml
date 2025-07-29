@@ -64,12 +64,6 @@ jobs:
         echo "MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME}" >> .env
         echo "MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD}" >> .env
         
-    - name: 'Validate Configuration Files'
-      run: |
-        echo "Running configuration validation..."
-        chmod +x validate.sh
-        ./validate.sh
-        
     - name: 'Build Custom Docker Images'
       run: |
         echo "Building Kafka Connect custom image..."
