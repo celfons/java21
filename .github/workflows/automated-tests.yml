@@ -24,6 +24,7 @@ env:
   MONGO_REPLICA_SET_NAME: rs0
   MONGO_INITDB_ROOT_USERNAME: admin
   MONGO_INITDB_ROOT_PASSWORD: password123
+  HEALTH_CHECK_RETRIES: 3
   
 jobs:
   integration-tests:
@@ -59,10 +60,14 @@ jobs:
     - name: 'Create Environment File'
       run: |
         cp .env.example .env
-        echo "COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME}" >> .env
-        echo "MONGO_REPLICA_SET_NAME=${MONGO_REPLICA_SET_NAME}" >> .env
-        echo "MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME}" >> .env
-        echo "MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD}" >> .env
+        # Override specific variables for testing environment
+        {
+          echo "COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME}"
+          echo "MONGO_REPLICA_SET_NAME=${MONGO_REPLICA_SET_NAME}" 
+          echo "MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME}"
+          echo "MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD}"
+          echo "HEALTH_CHECK_RETRIES=${HEALTH_CHECK_RETRIES}"
+        } >> .env
         
     - name: 'Build Custom Docker Images'
       run: |
