@@ -48,6 +48,12 @@ jobs:
         echo "deb [ arch=amd64,arm64 ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/7.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-7.0.list
         sudo apt-get update
         sudo apt-get install -y mongodb-mongosh
+        
+        # Create docker-compose alias for compatibility with existing scripts
+        sudo ln -sf /usr/local/bin/docker-compose /usr/bin/docker-compose || true
+        echo '#!/bin/bash' | sudo tee /usr/bin/docker-compose
+        echo 'docker compose "$@"' | sudo tee -a /usr/bin/docker-compose
+        sudo chmod +x /usr/bin/docker-compose
 
     - name: 'Create Environment File'
       run: |
@@ -70,7 +76,7 @@ jobs:
     - name: 'Start Services with Docker Compose'
       run: |
         echo "Starting all services..."
-        docker-compose up -d
+        docker compose up -d
         
         echo "Waiting for services to initialize..."
         sleep 60
@@ -78,19 +84,19 @@ jobs:
     - name: 'Display Service Status'
       run: |
         echo "=== Docker Compose Services Status ==="
-        docker-compose ps
+        docker compose ps
         echo ""
         echo "=== Service Logs (last 20 lines each) ==="
-        docker-compose logs --tail=20
+        docker compose logs --tail=20
         
     - name: 'Initialize MongoDB Replica Set'
       run: |
         echo "Initializing MongoDB replica set..."
         # Wait for MongoDB to be ready
-        timeout 120 bash -c 'until docker-compose exec -T mongo1 mongosh --eval "db.adminCommand(\"ping\")" > /dev/null 2>&1; do sleep 5; done'
+        timeout 120 bash -c 'until docker compose exec -T mongo1 mongosh --eval "db.adminCommand(\"ping\")" > /dev/null 2>&1; do sleep 5; done'
         
         # Initialize replica set
-        docker-compose exec -T mongo1 mongosh --file /docker-entrypoint-initdb.d/replica-init.js
+        docker compose exec -T mongo1 mongosh --file /docker-entrypoint-initdb.d/replica-init.js
         
         echo "Waiting for replica set to stabilize..."
         sleep 30
@@ -154,7 +160,7 @@ jobs:
         echo "Testing data insertion and Kafka message flow..."
         
         # Insert test data into MongoDB
-        docker-compose exec -T mongo1 mongosh --eval "
+        docker compose exec -T mongo1 mongosh --eval "
           use testdb;
           db.users.insertMany([
             {name: 'John Doe', email: 'john@example.com', createdAt: new Date()},
@@ -167,7 +173,7 @@ jobs:
         
         # Check if Kafka topics exist
         echo "Checking Kafka topics..."
-        docker-compose exec -T kafka kafka-topics --bootstrap-server localhost:9092 --list
+        docker compose exec -T kafka kafka-topics --bootstrap-server localhost:9092 --list
         
     - name: 'Generate Test Report'
       if: always()
@@ -178,7 +184,7 @@ jobs:
         echo "Branch: ${GITHUB_REF#refs/heads/}"
         echo ""
         echo "=== Final Service Status ==="
-        docker-compose ps
+        docker compose ps
         echo ""
         echo "=== Resource Usage ==="
         docker stats --no-stream
@@ -187,5 +193,5 @@ jobs:
       if: always()
       run: |
         echo "Stopping and cleaning up services..."
-        docker-compose down -v
+        docker compose down -v
         docker system prune -f

@@ -139,13 +139,13 @@ curl http://localhost:8083/connectors | jq .
 ##### Option 3: Manual Step-by-Step Testing
 ```bash
 # 1. Start services
-docker-compose up -d
+docker compose up -d
 
 # 2. Wait for initialization (important!)
 sleep 60
 
 # 3. Initialize MongoDB replica set
-docker-compose exec -T mongo1 mongosh --file /docker-entrypoint-initdb.d/replica-init.js
+docker compose exec -T mongo1 mongosh --file /docker-entrypoint-initdb.d/replica-init.js
 
 # 4. Setup Kafka Connect MongoDB Source Connector
 ./scripts/setup-connector.sh
@@ -154,14 +154,14 @@ docker-compose exec -T mongo1 mongosh --file /docker-entrypoint-initdb.d/replica
 ./scripts/health-check.sh
 
 # 6. Test data insertion
-docker-compose exec -T mongo1 mongosh --eval "
+docker compose exec -T mongo1 mongosh --eval "
   use testdb;
   db.users.insertOne({name: 'Test User', email: 'test@example.com'});
   db.users.find().forEach(printjson);
 "
 
 # 7. Check Kafka topics for messages
-docker-compose exec -T kafka kafka-topics --bootstrap-server localhost:9092 --list
+docker compose exec -T kafka kafka-topics --bootstrap-server localhost:9092 --list
 ```
 
 #### 🔧 Test Configuration
@@ -192,7 +192,7 @@ Ensure you have installed:
 # Increase wait times and retry
 
 # Check service logs
-docker-compose logs [service-name]
+docker compose logs [service-name]
 
 # Manual health check individual services
 curl http://localhost:8083/connectors        # Kafka Connect
@@ -200,7 +200,7 @@ curl http://localhost:8080                   # Kafka UI
 mongosh --host localhost:27017 --eval "db.adminCommand('ping')"  # MongoDB
 
 # Clean restart
-docker-compose down -v && docker-compose up -d
+docker compose down -v && docker compose up -d
 ```
 
 **Test timeout issues:**
