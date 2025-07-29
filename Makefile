@@ -95,6 +95,39 @@ sample-data: ## Insert sample data into MongoDB
 	@docker-compose exec -T mongo1 mongosh --file /tmp/sample-data.js
 	@echo "Sample data inserted successfully!"
 
+# TTL (Time To Live) Index Example
+ttl-setup: ## Setup TTL indexes for automatic document expiration
+	@echo "Setting up TTL indexes..."
+	@docker-compose exec -T mongo1 mongosh --file /tmp/ttl-setup.js
+	@echo "TTL indexes setup completed!"
+
+ttl-sample-data: ## Insert sample data with TTL expiration
+	@echo "Inserting TTL sample data..."
+	@docker-compose exec -T mongo1 mongosh --file /tmp/ttl-sample-data.js
+	@echo "TTL sample data inserted!"
+
+ttl-monitor: ## Monitor Change Streams for TTL expiration events
+	@echo "Starting TTL Change Stream monitor..."
+	@echo "Press Ctrl+C to stop monitoring"
+	@docker-compose exec -T mongo1 mongosh --file /tmp/ttl-monitor.js
+
+ttl-demo: ttl-setup ttl-sample-data ## Complete TTL demo setup (indexes + sample data)
+	@echo ""
+	@echo "🚀 TTL Demo is ready!"
+	@echo ""
+	@echo "📊 What was created:"
+	@echo "  - TTL index on sessions.expiresAt (expires immediately when time reached)"
+	@echo "  - TTL index on user_tokens.createdAt (expires after 60 seconds)"
+	@echo "  - Sample session documents that expire in 30-150 seconds"
+	@echo "  - Sample token documents that expire after 60 seconds"
+	@echo ""
+	@echo "🔍 Next steps:"
+	@echo "  1. Monitor TTL events: make ttl-monitor"
+	@echo "  2. Watch Kafka topics: make monitor-topics" 
+	@echo "  3. Check Kafka UI: http://localhost:8080"
+	@echo ""
+	@echo "⏰ Note: MongoDB TTL background task runs every 60 seconds"
+
 # Development helpers
 dev-setup: setup sample-data ## Complete development setup with sample data
 	@echo ""
@@ -109,6 +142,7 @@ dev-setup: setup sample-data ## Complete development setup with sample data
 	@echo "  - View logs: make logs"
 	@echo "  - Check status: make status"
 	@echo "  - Insert more data: make sample-data"
+	@echo "  - Try TTL example: make ttl-demo"
 
 # Monitor Kafka topics
 monitor-topics: ## Monitor Kafka topics for new messages
