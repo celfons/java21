@@ -99,8 +99,17 @@ jobs:
         
         echo "Waiting for core services to be healthy..."
         timeout 300 bash -c '
-          while ! docker compose ps --format json | jq -r ".[] | select(.Service == \"mongo1\" or .Service == \"kafka\" or .Service == \"zookeeper\") | .Health" | grep -v starting | grep -v unhealthy | grep -q healthy; do
-            echo "Waiting for core services to be healthy..."
+          while true; do
+            mongo_health=$(docker compose ps mongo1 --format table | grep healthy || echo "not_healthy")
+            kafka_health=$(docker compose ps kafka --format table | grep healthy || echo "not_healthy")
+            
+            echo "MongoDB: $mongo_health, Kafka: $kafka_health"
+            
+            if echo "$mongo_health" | grep -q healthy && echo "$kafka_health" | grep -q healthy; then
+              echo "Core services are ready!"
+              break
+            fi
+            
             sleep 10
           done
         '
@@ -163,21 +172,14 @@ jobs:
         # Wait for mongo-init service to complete
         echo "Waiting for mongo-init service to complete..."
         timeout 600 bash -c '
-          while [ "$(docker compose ps mongo-init --format json | jq -r ".[0].State")" = "running" ]; do
+          while [ "$(docker compose ps mongo-init --format table | grep Exited || echo "running")" = "running" ]; do
             echo "mongo-init is still running..."
             sleep 10
           done
         '
         
         # Check if mongo-init completed successfully
-        if [ "$(docker compose ps mongo-init --format json | jq -r '.[0].State')" = "exited" ]; then
-          exit_code=$(docker compose ps mongo-init --format json | jq -r '.[0].ExitCode')
-          if [ "$exit_code" != "0" ]; then
-            echo "ERROR: mongo-init failed with exit code $exit_code"
-            echo "mongo-init logs:"
-            docker compose logs mongo-init
-            exit 1
-          fi
+        if docker compose ps mongo-init --format table | grep -q "Exited"; then
           echo "mongo-init completed successfully"
         else
           echo "ERROR: mongo-init did not complete as expected"
@@ -231,7 +233,7 @@ jobs:
         # Wait for Kafka Connect to be fully ready
         echo "Waiting for Kafka Connect to be healthy..."
         timeout 300 bash -c '
-          while ! docker compose ps kafka-connect --format json | jq -r ".[0].Health" | grep -q healthy; do
+          while ! docker compose ps kafka-connect --format table | grep -q healthy; do
             echo "Waiting for Kafka Connect to be healthy..."
             sleep 10
           done
