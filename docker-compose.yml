@@ -241,7 +241,7 @@ services:
     environment:
       ME_CONFIG_MONGODB_ADMINUSERNAME: ${MONGO_INITDB_ROOT_USERNAME:-admin}
       ME_CONFIG_MONGODB_ADMINPASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:-password123}
-      ME_CONFIG_MONGODB_URL: mongodb://${MONGO_INITDB_ROOT_USERNAME:-admin}:${MONGO_INITDB_ROOT_PASSWORD:-password123}@mongo1:27017,mongo2:27017,mongo3:27017/?authSource=admin&replicaSet=${MONGO_REPLICA_SET_NAME:-rs0}
+      ME_CONFIG_MONGODB_URL: mongodb://admin:password123@mongo1:27017,mongo2:27017,mongo3:27017/?authSource=admin&replicaSet=${MONGO_REPLICA_SET_NAME:-rs0}
       ME_CONFIG_BASICAUTH_USERNAME: admin
       ME_CONFIG_BASICAUTH_PASSWORD: admin
     ports:
@@ -249,7 +249,7 @@ services:
     networks:
       - kafka-mongodb-network
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8081"]
+      test: ["CMD", "wget", "--spider", "-q", "--timeout=5", "http://localhost:8081"]
       interval: ${HEALTH_CHECK_INTERVAL:-30s}
       timeout: ${HEALTH_CHECK_TIMEOUT:-10s}
       retries: ${HEALTH_CHECK_RETRIES:-3}

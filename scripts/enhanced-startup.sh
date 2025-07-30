@@ -4,7 +4,7 @@ echo "$(date): Starting Kafka Connect with enhanced logging..."
 
 # Wait for Kafka to be available
 echo "$(date): Waiting for Kafka to be available..."
-while ! curl -s kafka:9092 > /dev/null; do
+while ! nc -z kafka 9092; do
     echo "$(date): Waiting for Kafka bootstrap server..."
     sleep 5
 done
