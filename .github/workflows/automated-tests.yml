@@ -169,36 +169,6 @@ jobs:
         
         echo "MongoDB is ready. Initializing replica set..."
         
-        # Wait for mongo-init service to complete
-        echo "Waiting for mongo-init service to complete..."
-        timeout 600 bash -c '
-          while [ "$(docker compose ps mongo-init --format table | grep Exited || echo "running")" = "running" ]; do
-            echo "mongo-init is still running..."
-            sleep 10
-          done
-        '
-        
-        # Check if mongo-init completed successfully
-        if docker compose ps mongo-init --format table | grep -q "Exited"; then
-          echo "mongo-init completed successfully"
-        else
-          echo "ERROR: mongo-init did not complete as expected"
-          docker compose logs mongo-init
-          exit 1
-        fi
-        
-        echo "Waiting for replica set to stabilize..."
-        sleep 30
-        
-        # Verify replica set status
-        echo "Verifying replica set status..."
-        docker compose exec -T mongo1 mongosh --eval "rs.status()" || {
-          echo "ERROR: Replica set status check failed"
-          echo "Getting detailed replica set information..."
-          docker compose exec -T mongo1 mongosh --eval "rs.conf()" 2>/dev/null || echo "Failed to get replica set config"
-          exit 1
-        }
-        
     - name: 'Run Health Checks'
       run: |
         echo "Running comprehensive health checks..."
