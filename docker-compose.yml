@@ -5,9 +5,6 @@ services:
     container_name: mongo1
     restart: unless-stopped
     command: mongod --replSet ${MONGO_REPLICA_SET_NAME:-rs0} --bind_ip_all --port 27017
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME:-admin}
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:-password123}
     ports:
       - "27017:27017"
     volumes:
@@ -20,11 +17,11 @@ services:
     networks:
       - kafka-mongodb-network
     healthcheck:
-      test: ["CMD", "bash", "-c", "mongosh --host localhost:27017 --username $$MONGO_INITDB_ROOT_USERNAME --password $$MONGO_INITDB_ROOT_PASSWORD --authenticationDatabase admin --eval 'db.adminCommand(\"ping\")' --quiet || exit 1"]
+      test: ["CMD", "bash", "-c", "mongosh --host localhost:27017 --eval 'db.adminCommand(\"ping\")' --quiet || exit 1"]
       interval: ${HEALTH_CHECK_INTERVAL:-30s}
       timeout: ${HEALTH_CHECK_TIMEOUT:-15s}
       retries: ${HEALTH_CHECK_RETRIES:-5}
-      start_period: 90s
+      start_period: 60s
 
   # MongoDB Replica Set - Secondary 1
   mongo2:
@@ -32,9 +29,6 @@ services:
     container_name: mongo2
     restart: unless-stopped
     command: mongod --replSet ${MONGO_REPLICA_SET_NAME:-rs0} --bind_ip_all --port 27017
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME:-admin}
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:-password123}
     ports:
       - "27018:27017"
     volumes:
@@ -45,11 +39,11 @@ services:
       mongo1:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "bash", "-c", "mongosh --host localhost:27017 --username $$MONGO_INITDB_ROOT_USERNAME --password $$MONGO_INITDB_ROOT_PASSWORD --authenticationDatabase admin --eval 'db.adminCommand(\"ping\")' --quiet || exit 1"]
+      test: ["CMD", "bash", "-c", "mongosh --host localhost:27017 --eval 'db.adminCommand(\"ping\")' --quiet || exit 1"]
       interval: ${HEALTH_CHECK_INTERVAL:-30s}
       timeout: ${HEALTH_CHECK_TIMEOUT:-15s}
       retries: ${HEALTH_CHECK_RETRIES:-5}
-      start_period: 90s
+      start_period: 60s
 
   # MongoDB Replica Set - Secondary 2
   mongo3:
@@ -57,9 +51,6 @@ services:
     container_name: mongo3
     restart: unless-stopped
     command: mongod --replSet ${MONGO_REPLICA_SET_NAME:-rs0} --bind_ip_all --port 27017
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME:-admin}
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:-password123}
     ports:
       - "27019:27017"
     volumes:
@@ -70,11 +61,11 @@ services:
       mongo1:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "bash", "-c", "mongosh --host localhost:27017 --username $$MONGO_INITDB_ROOT_USERNAME --password $$MONGO_INITDB_ROOT_PASSWORD --authenticationDatabase admin --eval 'db.adminCommand(\"ping\")' --quiet || exit 1"]
+      test: ["CMD", "bash", "-c", "mongosh --host localhost:27017 --eval 'db.adminCommand(\"ping\")' --quiet || exit 1"]
       interval: ${HEALTH_CHECK_INTERVAL:-30s}
       timeout: ${HEALTH_CHECK_TIMEOUT:-15s}
       retries: ${HEALTH_CHECK_RETRIES:-5}
-      start_period: 90s
+      start_period: 60s
 
   # MongoDB Replica Set Initializer
   mongo-init:
@@ -104,12 +95,12 @@ services:
         sleep 10
         
         echo 'Testing MongoDB connections...'
-        mongosh --host mongo1:27017 --username $$MONGO_INITDB_ROOT_USERNAME --password $$MONGO_INITDB_ROOT_PASSWORD --authenticationDatabase admin --eval 'db.adminCommand(\"ping\")' --quiet
-        mongosh --host mongo2:27017 --username $$MONGO_INITDB_ROOT_USERNAME --password $$MONGO_INITDB_ROOT_PASSWORD --authenticationDatabase admin --eval 'db.adminCommand(\"ping\")' --quiet
-        mongosh --host mongo3:27017 --username $$MONGO_INITDB_ROOT_USERNAME --password $$MONGO_INITDB_ROOT_PASSWORD --authenticationDatabase admin --eval 'db.adminCommand(\"ping\")' --quiet
+        mongosh --host mongo1:27017 --eval 'db.adminCommand(\"ping\")' --quiet
+        mongosh --host mongo2:27017 --eval 'db.adminCommand(\"ping\")' --quiet
+        mongosh --host mongo3:27017 --eval 'db.adminCommand(\"ping\")' --quiet
         
         echo 'Initializing replica set...'
-        mongosh --host mongo1:27017 --username $$MONGO_INITDB_ROOT_USERNAME --password $$MONGO_INITDB_ROOT_PASSWORD --authenticationDatabase admin --file /tmp/replica-init.js
+        mongosh --host mongo1:27017 --file /tmp/replica-init.js
         
         echo 'Replica set initialization completed'
         sleep 5

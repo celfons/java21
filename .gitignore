@@ -75,6 +75,9 @@ build/
 *.p12
 *.jks
 
+# MongoDB replica set key
+config/mongodb/replica.key
+
 # Docker override files
 docker-compose.override.yml
 docker-compose.*.yml

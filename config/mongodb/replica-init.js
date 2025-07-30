@@ -110,6 +110,29 @@ if (!success && attempts >= maxAttempts) {
 } else {
     print("✓ Replica set initialization completed successfully");
     
+    // Create admin user for authentication
+    try {
+        print("Creating admin user...");
+        db = db.getSiblingDB('admin');
+        
+        // Check if admin user already exists
+        var adminUser = db.getUser("admin");
+        if (!adminUser) {
+            db.createUser({
+                user: "admin",
+                pwd: "password123",
+                roles: [
+                    { role: "root", db: "admin" }
+                ]
+            });
+            print("✓ Admin user created successfully");
+        } else {
+            print("✓ Admin user already exists");
+        }
+    } catch (error) {
+        print("Warning: Could not create admin user: " + error);
+    }
+    
     // Create application database and collections
     try {
         db = db.getSiblingDB('exemplo');
@@ -157,4 +180,5 @@ if (!success && attempts >= maxAttempts) {
     print("  - mongo2:27017 (SECONDARY, priority: 1)");
     print("  - mongo3:27017 (SECONDARY, priority: 1)");
     print("Database 'exemplo' created with sample collections and indexes");
+    print("Admin user created: admin/password123");
 }
