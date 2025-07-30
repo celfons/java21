@@ -24,9 +24,13 @@ env:
   MONGO_REPLICA_SET_NAME: rs0
   MONGO_INITDB_ROOT_USERNAME: admin
   MONGO_INITDB_ROOT_PASSWORD: password123
-  HEALTH_CHECK_RETRIES: 3
   
   # Enhanced timeout configuration for CI environment
+  HEALTH_CHECK_RETRIES: 5
+  HEALTH_CHECK_INTERVAL: 20s
+  HEALTH_CHECK_TIMEOUT: 15s
+  HEALTH_CHECK_START_PERIOD: 120s
+  
   MONGO_INIT_MAX_ATTEMPTS: 120
   MONGO_INIT_SLEEP_INTERVAL: 5
   CONTAINER_CHECK_TIMEOUT: 600
@@ -72,6 +76,9 @@ jobs:
           echo "MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME}"
           echo "MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD}"
           echo "HEALTH_CHECK_RETRIES=${HEALTH_CHECK_RETRIES}"
+          echo "HEALTH_CHECK_INTERVAL=${HEALTH_CHECK_INTERVAL}"
+          echo "HEALTH_CHECK_TIMEOUT=${HEALTH_CHECK_TIMEOUT}"
+          echo "HEALTH_CHECK_START_PERIOD=${HEALTH_CHECK_START_PERIOD}"
           echo "MONGO_INIT_MAX_ATTEMPTS=${MONGO_INIT_MAX_ATTEMPTS}"
           echo "MONGO_INIT_SLEEP_INTERVAL=${MONGO_INIT_SLEEP_INTERVAL}"
           echo "CONTAINER_CHECK_TIMEOUT=${CONTAINER_CHECK_TIMEOUT}"
@@ -90,8 +97,22 @@ jobs:
         echo "Starting all services..."
         docker compose up -d
         
-        echo "Waiting for services to initialize..."
-        sleep 60
+        echo "Waiting for core services to be healthy..."
+        timeout 300 bash -c '
+          while true; do
+            mongo_health=$(docker compose ps mongo1 --format table | grep healthy || echo "not_healthy")
+            kafka_health=$(docker compose ps kafka --format table | grep healthy || echo "not_healthy")
+            
+            echo "MongoDB: $mongo_health, Kafka: $kafka_health"
+            
+            if echo "$mongo_health" | grep -q healthy && echo "$kafka_health" | grep -q healthy; then
+              echo "Core services are ready!"
+              break
+            fi
+            
+            sleep 10
+          done
+        '
         
     - name: 'Display Service Status'
       run: |
@@ -148,18 +169,26 @@ jobs:
         
         echo "MongoDB is ready. Initializing replica set..."
         
-        # Initialize replica set with enhanced error handling
-        if docker compose exec -T mongo1 mongosh --file /docker-entrypoint-initdb.d/replica-init.js; then
-          echo "Replica set initialization script completed successfully"
+        # Wait for mongo-init service to complete
+        echo "Waiting for mongo-init service to complete..."
+        timeout 600 bash -c '
+          while [ "$(docker compose ps mongo-init --format table | grep Exited || echo "running")" = "running" ]; do
+            echo "mongo-init is still running..."
+            sleep 10
+          done
+        '
+        
+        # Check if mongo-init completed successfully
+        if docker compose ps mongo-init --format table | grep -q "Exited"; then
+          echo "mongo-init completed successfully"
         else
-          echo "ERROR: Replica set initialization failed"
-          echo "Checking MongoDB logs for errors..."
-          docker compose logs mongo1
+          echo "ERROR: mongo-init did not complete as expected"
+          docker compose logs mongo-init
           exit 1
         fi
         
         echo "Waiting for replica set to stabilize..."
-        sleep 60
+        sleep 30
         
         # Verify replica set status
         echo "Verifying replica set status..."
@@ -202,14 +231,20 @@ jobs:
         echo "Setting up and testing Kafka Connect MongoDB Source Connector..."
         
         # Wait for Kafka Connect to be fully ready
-        timeout 300 bash -c 'until curl -s -f http://localhost:8083/connectors > /dev/null; do sleep 5; done'
+        echo "Waiting for Kafka Connect to be healthy..."
+        timeout 300 bash -c '
+          while ! docker compose ps kafka-connect --format table | grep -q healthy; do
+            echo "Waiting for Kafka Connect to be healthy..."
+            sleep 10
+          done
+        '
         
         # Setup connector
         chmod +x scripts/setup-connector.sh
         ./scripts/setup-connector.sh
         
         # Verify connector is running
-        sleep 30
+        sleep 15
         curl -s http://localhost:8083/connectors | jq .
         
         # Check connector status
