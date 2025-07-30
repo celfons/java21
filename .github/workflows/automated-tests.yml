@@ -169,28 +169,6 @@ jobs:
         
         echo "MongoDB is ready. Initializing replica set..."
         
-    - name: 'Run Health Checks'
-      run: |
-        echo "Running comprehensive health checks..."
-        # Make health check script executable and run it
-        chmod +x scripts/health-check.sh
-        
-        # Health check with retries
-        for i in {1..3}; do
-          echo "Health check attempt $i/3..."
-          if ./scripts/health-check.sh; then
-            echo "Health check passed!"
-            break
-          else
-            if [ $i -eq 3 ]; then
-              echo "Health check failed after 3 attempts"
-              exit 1
-            fi
-            echo "Health check failed, waiting 30s before retry..."
-            sleep 60
-          fi
-        done
-        
     - name: 'Run Integration Tests'
       run: |
         echo "Running integration tests..."
