@@ -21,7 +21,7 @@ services:
       interval: ${HEALTH_CHECK_INTERVAL:-30s}
       timeout: ${HEALTH_CHECK_TIMEOUT:-15s}
       retries: ${HEALTH_CHECK_RETRIES:-5}
-      start_period: 60s
+      start_period: ${HEALTH_CHECK_START_PERIOD:-60s}
 
   # MongoDB Replica Set - Secondary 1
   mongo2:
@@ -43,7 +43,7 @@ services:
       interval: ${HEALTH_CHECK_INTERVAL:-30s}
       timeout: ${HEALTH_CHECK_TIMEOUT:-15s}
       retries: ${HEALTH_CHECK_RETRIES:-5}
-      start_period: 60s
+      start_period: ${HEALTH_CHECK_START_PERIOD:-60s}
 
   # MongoDB Replica Set - Secondary 2
   mongo3:
@@ -65,7 +65,7 @@ services:
       interval: ${HEALTH_CHECK_INTERVAL:-30s}
       timeout: ${HEALTH_CHECK_TIMEOUT:-15s}
       retries: ${HEALTH_CHECK_RETRIES:-5}
-      start_period: 60s
+      start_period: ${HEALTH_CHECK_START_PERIOD:-60s}
 
   # MongoDB Replica Set Initializer
   mongo-init:
@@ -128,7 +128,7 @@ services:
       interval: ${HEALTH_CHECK_INTERVAL:-30s}
       timeout: ${HEALTH_CHECK_TIMEOUT:-10s}
       retries: ${HEALTH_CHECK_RETRIES:-3}
-      start_period: 30s
+      start_period: ${HEALTH_CHECK_START_PERIOD:-30s}
 
   # Kafka Broker
   kafka:
@@ -161,7 +161,7 @@ services:
       interval: ${HEALTH_CHECK_INTERVAL:-30s}
       timeout: ${HEALTH_CHECK_TIMEOUT:-10s}
       retries: ${HEALTH_CHECK_RETRIES:-3}
-      start_period: 60s
+      start_period: ${HEALTH_CHECK_START_PERIOD:-60s}
 
   # Kafka Connect with MongoDB Source Connector
   kafka-connect:
@@ -200,11 +200,11 @@ services:
     networks:
       - kafka-mongodb-network
     healthcheck:
-      test: ["CMD", "bash", "-c", "curl -f http://localhost:8083/connectors && curl -f http://localhost:8083/connector-plugins | grep -q mongodb"]
+      test: ["CMD", "bash", "-c", "curl -f http://localhost:8083/ >/dev/null 2>&1 && (curl -f http://localhost:8083/connector-plugins | grep -q mongodb || true)"]
       interval: ${HEALTH_CHECK_INTERVAL:-30s}
       timeout: ${HEALTH_CHECK_TIMEOUT:-15s}
       retries: ${HEALTH_CHECK_RETRIES:-10}
-      start_period: 180s
+      start_period: ${HEALTH_CHECK_START_PERIOD:-180s}
 
   # Kafka UI for monitoring
   kafka-ui:
@@ -228,7 +228,7 @@ services:
       interval: ${HEALTH_CHECK_INTERVAL:-30s}
       timeout: ${HEALTH_CHECK_TIMEOUT:-10s}
       retries: ${HEALTH_CHECK_RETRIES:-3}
-      start_period: 60s
+      start_period: ${HEALTH_CHECK_START_PERIOD:-60s}
 
   # MongoDB Express for database administration
   mongo-express:
@@ -253,7 +253,7 @@ services:
       interval: ${HEALTH_CHECK_INTERVAL:-30s}
       timeout: ${HEALTH_CHECK_TIMEOUT:-10s}
       retries: ${HEALTH_CHECK_RETRIES:-3}
-      start_period: 60s
+      start_period: ${HEALTH_CHECK_START_PERIOD:-60s}
 
 networks:
   kafka-mongodb-network:

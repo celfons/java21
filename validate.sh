@@ -51,7 +51,7 @@ validate_script() {
 validate_docker_compose() {
     echo -n "Validating Docker Compose configuration... "
     
-    if docker-compose config --quiet 2>/dev/null; then
+    if docker compose config --quiet 2>/dev/null; then
         echo -e "${GREEN}✓ Valid${NC}"
         return 0
     else
@@ -74,8 +74,12 @@ check_prerequisites() {
     fi
     
     # Check Docker Compose
-    if command_exists docker-compose; then
-        echo -e "Docker Compose: ${GREEN}✓ Installed ($(docker-compose --version | cut -d' ' -f3 | tr -d ','))${NC}"
+    if command_exists docker-compose || docker compose version >/dev/null 2>&1; then
+        if command_exists docker-compose; then
+            echo -e "Docker Compose: ${GREEN}✓ Installed ($(docker-compose --version | cut -d' ' -f3 | tr -d ','))${NC}"
+        else
+            echo -e "Docker Compose: ${GREEN}✓ Installed ($(docker compose version --short 2>/dev/null || echo "v2"))${NC}"
+        fi
     else
         echo -e "Docker Compose: ${RED}✗ Not installed${NC}"
         all_good=false

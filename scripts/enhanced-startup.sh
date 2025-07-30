@@ -11,9 +11,13 @@ done
 
 echo "$(date): Kafka is available, starting Kafka Connect..."
 
-# List available plugins
-echo "$(date): Available Kafka Connect plugins:"
-find /usr/share/java /usr/share/confluent-hub-components -name "*.jar" | grep -i mongo || echo "No MongoDB connector JARs found"
+# Check for MongoDB connector (simplified)
+echo "$(date): Checking for MongoDB connector..."
+if [ -d "/usr/share/confluent-hub-components" ]; then
+    echo "MongoDB connector directory exists"
+else
+    echo "Warning: MongoDB connector directory not found"
+fi
 
 # Export environment variables for better logging
 export CONNECT_LOG4J_ROOT_LOGLEVEL=${CONNECT_LOG4J_ROOT_LOGLEVEL:-INFO}

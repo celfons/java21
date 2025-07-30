@@ -17,12 +17,12 @@ help: ## Show this help message
 # Build Docker images
 build: ## Build custom Docker images
 	@echo "Building custom Kafka Connect image..."
-	docker-compose build kafka-connect
+	docker compose build kafka-connect
 
 # Start all services
 up: .env ## Start all services with Docker Compose
 	@echo "Starting MongoDB Kafka Connector Example..."
-	docker-compose up -d
+	docker compose up -d
 	@echo ""
 	@echo "Services starting up. Use 'make logs' to monitor progress."
 	@echo "Use 'make status' to check service health."
@@ -30,7 +30,7 @@ up: .env ## Start all services with Docker Compose
 # Stop all services
 down: ## Stop all services
 	@echo "Stopping all services..."
-	docker-compose down
+	docker compose down
 
 # Complete setup process
 setup: .env build up ## Complete setup: build, start services, initialize replica set, and setup connector
@@ -38,7 +38,7 @@ setup: .env build up ## Complete setup: build, start services, initialize replic
 	@echo "Waiting for services to start..."
 	@sleep 30
 	@echo "Initializing MongoDB replica set..."
-	@docker-compose exec -T mongo1 mongosh --file /docker-entrypoint-initdb.d/replica-init.js
+	@docker compose exec -T mongo1 mongosh --file /docker-entrypoint-initdb.d/replica-init.js
 	@echo "Waiting for replica set to stabilize..."
 	@sleep 20
 	@echo "Setting up Kafka Connect MongoDB Source Connector..."
@@ -55,16 +55,16 @@ setup-multi-connectors: ## Setup multiple connectors with operation filtering (i
 
 # View logs
 logs: ## Show logs for all services
-	docker-compose logs -f
+	docker compose logs -f
 
 logs-mongo: ## Show MongoDB logs
-	docker-compose logs -f mongo1 mongo2 mongo3
+	docker compose logs -f mongo1 mongo2 mongo3
 
 logs-kafka: ## Show Kafka logs
-	docker-compose logs -f kafka zookeeper
+	docker compose logs -f kafka zookeeper
 
 logs-connect: ## Show Kafka Connect logs
-	docker-compose logs -f kafka-connect
+	docker compose logs -f kafka-connect
 
 # Check service status
 status: ## Check the status of all services
@@ -74,7 +74,7 @@ status: ## Check the status of all services
 # Clean up everything
 clean: down ## Stop services and remove volumes
 	@echo "Cleaning up volumes and networks..."
-	docker-compose down -v --remove-orphans
+	docker compose down -v --remove-orphans
 	@echo "Pruning unused Docker resources..."
 	docker system prune -f
 
@@ -84,7 +84,7 @@ test: ## Run health checks and basic tests
 	@./scripts/health-check.sh
 	@echo ""
 	@echo "Testing Kafka topics..."
-	@docker-compose exec -T kafka kafka-topics --bootstrap-server localhost:9092 --list
+	@docker compose exec -T kafka kafka-topics --bootstrap-server localhost:9092 --list
 	@echo ""
 	@echo "Testing Kafka Connect status..."
 	@curl -s http://localhost:8083/connectors | jq .
@@ -92,24 +92,24 @@ test: ## Run health checks and basic tests
 # Insert sample data
 sample-data: ## Insert sample data into MongoDB
 	@echo "Inserting sample data..."
-	@docker-compose exec -T mongo1 mongosh --file /tmp/sample-data.js
+	@docker compose exec -T mongo1 mongosh --file /tmp/sample-data.js
 	@echo "Sample data inserted successfully!"
 
 # TTL (Time To Live) Index Example
 ttl-setup: ## Setup TTL indexes for automatic document expiration
 	@echo "Setting up TTL indexes..."
-	@docker-compose exec -T mongo1 mongosh --file /tmp/ttl-setup.js
+	@docker compose exec -T mongo1 mongosh --file /tmp/ttl-setup.js
 	@echo "TTL indexes setup completed!"
 
 ttl-sample-data: ## Insert sample data with TTL expiration
 	@echo "Inserting TTL sample data..."
-	@docker-compose exec -T mongo1 mongosh --file /tmp/ttl-sample-data.js
+	@docker compose exec -T mongo1 mongosh --file /tmp/ttl-sample-data.js
 	@echo "TTL sample data inserted!"
 
 ttl-monitor: ## Monitor Change Streams for TTL expiration events
 	@echo "Starting TTL Change Stream monitor..."
 	@echo "Press Ctrl+C to stop monitoring"
-	@docker-compose exec -T mongo1 mongosh --file /tmp/ttl-monitor.js
+	@docker compose exec -T mongo1 mongosh --file /tmp/ttl-monitor.js
 
 ttl-demo: ttl-setup ttl-sample-data ## Complete TTL demo setup (indexes + sample data)
 	@echo ""
@@ -147,20 +147,20 @@ dev-setup: setup sample-data ## Complete development setup with sample data
 # Monitor Kafka topics
 monitor-topics: ## Monitor Kafka topics for new messages
 	@echo "Monitoring Kafka topics (Ctrl+C to stop)..."
-	@docker-compose exec kafka kafka-console-consumer \
+	@docker compose exec kafka kafka-console-consumer \
 		--bootstrap-server localhost:9092 \
 		--topic mongodb.exemplo.users \
 		--from-beginning
 
 # Restart specific service
 restart-mongo: ## Restart MongoDB services
-	docker-compose restart mongo1 mongo2 mongo3
+	docker compose restart mongo1 mongo2 mongo3
 
 restart-kafka: ## Restart Kafka services
-	docker-compose restart zookeeper kafka
+	docker compose restart zookeeper kafka
 
 restart-connect: ## Restart Kafka Connect
-	docker-compose restart kafka-connect
+	docker compose restart kafka-connect
 
 # Show service URLs
 urls: ## Show service access URLs
@@ -177,7 +177,7 @@ urls: ## Show service access URLs
 backup: ## Backup MongoDB data
 	@echo "Creating MongoDB backup..."
 	@mkdir -p backups
-	@docker-compose exec -T mongo1 mongodump --host mongo1:27017 --out /tmp/backup
+	@docker compose exec -T mongo1 mongodump --host mongo1:27017 --out /tmp/backup
 	@docker cp mongo1:/tmp/backup ./backups/$(shell date +%Y%m%d_%H%M%S)
 	@echo "Backup completed!"
 
@@ -188,7 +188,7 @@ restore: ## Restore MongoDB data (specify BACKUP_DIR=path)
 	fi
 	@echo "Restoring MongoDB data from $(BACKUP_DIR)..."
 	@docker cp $(BACKUP_DIR) mongo1:/tmp/restore
-	@docker-compose exec -T mongo1 mongorestore /tmp/restore
+	@docker compose exec -T mongo1 mongorestore /tmp/restore
 	@echo "Restore completed!"
 
 # Production helpers
@@ -231,15 +231,15 @@ azure-test-local: azure-env azure-build ## Test Azure configuration locally
 		echo "❌ .env.azure not found. Run 'make azure-env' first"; \
 		exit 1; \
 	fi
-	docker-compose -f docker-compose.azure.yml --env-file .env.azure up -d
+	docker compose -f docker-compose.azure.yml --env-file .env.azure up -d
 	@echo "🚀 Azure configuration running locally"
 	@echo "🔗 API: http://localhost:8083"
 
 azure-logs: ## Show logs for Azure local test
-	docker-compose -f docker-compose.azure.yml logs -f
+	docker compose -f docker-compose.azure.yml logs -f
 
 azure-stop: ## Stop Azure local test
-	docker-compose -f docker-compose.azure.yml down
+	docker compose -f docker-compose.azure.yml down
 
 azure-validate: ## Validate Azure deployment configuration
 	@./scripts/validate-azure.sh
