@@ -18,19 +18,16 @@ RUN echo "Installing MongoDB Kafka Connector..." && \
     confluent-hub install --no-prompt mongodb/kafka-connect-mongodb:1.11.1 || \
     echo "Warning: Could not install MongoDB connector automatically"
 
-# Create directories for configuration and logs
-RUN mkdir -p /etc/kafka-connect /var/log/kafka-connect /usr/share/confluent-hub-components
-
-# Copy production configuration files if they exist
-COPY config/kafka-connect/ /etc/kafka-connect/
+# Create directories for logs only (avoid conflicts with default config)
+RUN mkdir -p /var/log/kafka-connect /usr/share/confluent-hub-components
 
 # Copy startup and health check scripts
 COPY scripts/enhanced-startup.sh /usr/local/bin/enhanced-startup.sh
 COPY scripts/enhanced-health-check.sh /usr/local/bin/enhanced-health-check.sh
 
-# Set proper permissions
+# Set proper permissions for appuser
 RUN chmod +x /usr/local/bin/enhanced-startup.sh /usr/local/bin/enhanced-health-check.sh
-RUN chown -R appuser:appuser /etc/kafka-connect /var/log/kafka-connect /usr/local/bin/enhanced-startup.sh /usr/local/bin/enhanced-health-check.sh
+RUN chown -R appuser:appuser /var/log/kafka-connect /usr/local/bin/enhanced-startup.sh /usr/local/bin/enhanced-health-check.sh
 
 # Health check configurado para Azure
 HEALTHCHECK --interval=30s --timeout=15s --start-period=180s --retries=10 \
@@ -42,5 +39,5 @@ EXPOSE 8083
 # Switch back to appuser for security
 USER appuser
 
-# Use enhanced startup script
-CMD ["/usr/local/bin/enhanced-startup.sh"]
+# Use default startup script but with our enhanced script as an init process
+CMD ["/etc/confluent/docker/run"]

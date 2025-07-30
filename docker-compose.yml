@@ -195,8 +195,6 @@ services:
       CONNECT_LOG4J_LOGGERS: "org.apache.kafka.connect.runtime.rest=WARN,org.reflections=ERROR"
     ports:
       - "8083:8083"
-    volumes:
-      - ./config/kafka-connect:/etc/kafka-connect
     networks:
       - kafka-mongodb-network
     healthcheck:
