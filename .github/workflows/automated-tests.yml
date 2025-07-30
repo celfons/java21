@@ -26,10 +26,10 @@ env:
   MONGO_INITDB_ROOT_PASSWORD: password123
   
   # Enhanced timeout configuration for CI environment
-  HEALTH_CHECK_RETRIES: 5
+  HEALTH_CHECK_RETRIES: 8
   HEALTH_CHECK_INTERVAL: 20s
   HEALTH_CHECK_TIMEOUT: 15s
-  HEALTH_CHECK_START_PERIOD: 120s
+  HEALTH_CHECK_START_PERIOD: 180s
   
   MONGO_INIT_MAX_ATTEMPTS: 120
   MONGO_INIT_SLEEP_INTERVAL: 5
@@ -98,19 +98,19 @@ jobs:
         docker compose up -d
         
         echo "Waiting for core services to be healthy..."
-        timeout 300 bash -c '
+        timeout 600 bash -c '
           while true; do
-            mongo_health=$(docker compose ps mongo1 --format table | grep healthy || echo "not_healthy")
-            kafka_health=$(docker compose ps kafka --format table | grep healthy || echo "not_healthy")
+            mongo_status=$(docker compose ps mongo1 --format "table {{.Status}}" | tail -n +2 || echo "not_found")
+            kafka_status=$(docker compose ps kafka --format "table {{.Status}}" | tail -n +2 || echo "not_found")
             
-            echo "MongoDB: $mongo_health, Kafka: $kafka_health"
+            echo "MongoDB: $mongo_status, Kafka: $kafka_status"
             
-            if echo "$mongo_health" | grep -q healthy && echo "$kafka_health" | grep -q healthy; then
+            if echo "$mongo_status" | grep -q "healthy" && echo "$kafka_status" | grep -q "healthy"; then
               echo "Core services are ready!"
               break
             fi
             
-            sleep 10
+            sleep 15
           done
         '
         
@@ -143,21 +143,44 @@ jobs:
           echo "---"
         done
         
-        # Use enhanced timeout with detailed logging
-        echo "Testing MongoDB connectivity with enhanced timeout (10 minutes)..."
-        timeout 600 bash -c '
+        # Wait for mongo-init to complete successfully
+        echo "Waiting for mongo-init to complete..."
+        timeout 900 bash -c '
+          while true; do
+            mongo_init_status=$(docker compose ps mongo-init --format "table {{.Status}}" 2>/dev/null | tail -n +2 || echo "not_found")
+            echo "mongo-init status: $mongo_init_status"
+            
+            if echo "$mongo_init_status" | grep -q "Exited (0)"; then
+              echo "mongo-init completed successfully!"
+              break
+            elif echo "$mongo_init_status" | grep -q "Exited ([1-9]"; then
+              echo "ERROR: mongo-init failed!"
+              docker compose logs mongo-init
+              exit 1
+            fi
+            
+            echo "Waiting for mongo-init to complete..."
+            sleep 10
+          done
+        '
+        
+        # Test MongoDB connectivity after initialization
+        echo "Testing MongoDB connectivity after initialization..."
+        timeout 300 bash -c '
           attempt=1
-          max_attempts=120
+          max_attempts=60
           while [ $attempt -le $max_attempts ]; do
             echo "[$attempt/$max_attempts] Testing MongoDB connectivity..."
             
-            if docker compose exec -T mongo1 mongosh --eval "db.adminCommand(\"ping\")" > /dev/null 2>&1; then
-              echo "MongoDB connectivity test passed!"
+            if docker compose exec -T mongo1 mongosh --username admin --password password123 --authenticationDatabase admin --eval "db.adminCommand(\"ping\")" > /dev/null 2>&1; then
+              echo "MongoDB authenticated connectivity test passed!"
               break
             fi
             
             if [ $attempt -eq $max_attempts ]; then
-              echo "ERROR: MongoDB connectivity test failed after $max_attempts attempts"
+              echo "ERROR: MongoDB authenticated connectivity test failed after $max_attempts attempts"
+              echo "Checking replica set status..."
+              docker compose exec -T mongo1 mongosh --username admin --password password123 --authenticationDatabase admin --eval "rs.status()" || true
               exit 1
             fi
             
@@ -167,7 +190,7 @@ jobs:
           done
         '
         
-        echo "MongoDB is ready. Initializing replica set..."
+        echo "MongoDB is ready and initialized!"
         
     - name: 'Run Integration Tests'
       run: |
@@ -181,8 +204,13 @@ jobs:
         # Wait for Kafka Connect to be fully ready
         echo "Waiting for Kafka Connect to be healthy..."
         timeout 300 bash -c '
-          while ! docker compose ps kafka-connect --format table | grep -q healthy; do
-            echo "Waiting for Kafka Connect to be healthy..."
+          while true; do
+            connect_status=$(docker compose ps kafka-connect --format "table {{.Status}}" | tail -n +2)
+            echo "Kafka Connect status: $connect_status"
+            if echo "$connect_status" | grep -q "healthy"; then
+              echo "Kafka Connect is healthy!"
+              break
+            fi
             sleep 10
           done
         '
@@ -212,7 +240,7 @@ jobs:
         echo "Testing data insertion and Kafka message flow..."
         
         # Insert test data into MongoDB
-        docker compose exec -T mongo1 mongosh --eval "
+        docker compose exec -T mongo1 mongosh --username admin --password password123 --authenticationDatabase admin --eval "
           use testdb;
           db.users.insertMany([
             {name: 'John Doe', email: 'john@example.com', createdAt: new Date()},

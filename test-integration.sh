@@ -45,39 +45,84 @@ docker compose up -d
 
 # Wait for services to be healthy
 log_info "Waiting for core services to be healthy..."
-timeout 300 bash -c '
+timeout 600 bash -c '
     while true; do
-        # Check MongoDB health
-        mongo_health=$(docker compose ps mongo1 --format json | jq -r ".[0].Health // \"unknown\"")
-        # Check Kafka health
-        kafka_health=$(docker compose ps kafka --format json | jq -r ".[0].Health // \"unknown\"")
-        # Check mongo-init completion
-        mongo_init_state=$(docker compose ps mongo-init --format json | jq -r ".[0].State // \"unknown\"")
+        # Check MongoDB health using simple docker compose ps
+        mongo1_status=$(docker compose ps mongo1 --format "table {{.Status}}" | tail -n +2)
+        mongo2_status=$(docker compose ps mongo2 --format "table {{.Status}}" | tail -n +2)
+        mongo3_status=$(docker compose ps mongo3 --format "table {{.Status}}" | tail -n +2)
         
-        echo "MongoDB: $mongo_health, Kafka: $kafka_health, mongo-init: $mongo_init_state"
+        echo "MongoDB1: $mongo1_status"
+        echo "MongoDB2: $mongo2_status" 
+        echo "MongoDB3: $mongo3_status"
         
-        if [ "$mongo_health" = "healthy" ] && [ "$kafka_health" = "healthy" ] && [ "$mongo_init_state" = "exited" ]; then
-            echo "Core services are ready!"
+        if echo "$mongo1_status" | grep -q "healthy" && echo "$mongo2_status" | grep -q "healthy" && echo "$mongo3_status" | grep -q "healthy"; then
+            echo "All MongoDB containers are healthy!"
             break
         fi
         
+        sleep 15
+    done
+'
+
+# Wait for mongo-init to complete  
+log_info "Waiting for mongo-init to complete..."
+timeout 600 bash -c '
+    while true; do
+        mongo_init_status=$(docker compose ps mongo-init --format "table {{.Status}}" 2>/dev/null | tail -n +2 || echo "not_found")
+        echo "mongo-init status: $mongo_init_status"
+        
+        if echo "$mongo_init_status" | grep -q "Exited (0)"; then
+            echo "mongo-init completed successfully!"
+            break
+        elif echo "$mongo_init_status" | grep -q "Exited ([1-9]"; then
+            echo "ERROR: mongo-init failed!"
+            docker compose logs mongo-init
+            exit 1
+        fi
+        
+        echo "Waiting for mongo-init to complete..."
         sleep 10
+    done
+'
+
+# Additional wait for MongoDB to be ready for authenticated connections
+log_info "Verifying MongoDB is ready for authenticated connections..."
+timeout 300 bash -c '
+    attempt=1
+    max_attempts=60
+    while [ $attempt -le $max_attempts ]; do
+        echo "[$attempt/$max_attempts] Testing MongoDB authenticated connectivity..."
+        
+        if docker compose exec -T mongo1 mongosh --username admin --password password123 --authenticationDatabase admin --eval "db.adminCommand(\"ping\")" --quiet > /dev/null 2>&1; then
+            echo "MongoDB authenticated connectivity confirmed!"
+            break
+        fi
+        
+        if [ $attempt -eq $max_attempts ]; then
+            echo "ERROR: MongoDB authenticated connectivity failed after $max_attempts attempts"
+            exit 1
+        fi
+        
+        echo "Waiting 5s before retry..."
+        sleep 5
+        ((attempt++))
     done
 '
 
 # Check Kafka Connect
 log_info "Waiting for Kafka Connect to be healthy..."
-timeout 300 bash -c '
+timeout 600 bash -c '
     while true; do
-        connect_health=$(docker compose ps kafka-connect --format json | jq -r ".[0].Health // \"unknown\"")
-        echo "Kafka Connect: $connect_health"
+        connect_status=$(docker compose ps kafka-connect --format "table {{.Status}}" | tail -n +2)
+        echo "Kafka Connect: $connect_status"
         
-        if [ "$connect_health" = "healthy" ]; then
+        if echo "$connect_status" | grep -q "healthy"; then
             echo "Kafka Connect is ready!"
             break
         fi
         
-        sleep 15
+        sleep 20
     done
 '
 
@@ -109,7 +154,7 @@ fi
 
 # Test MongoDB connectivity
 log_info "Testing MongoDB connectivity..."
-if docker compose exec -T mongo1 mongosh --eval "db.adminCommand('ping')" --quiet > /dev/null; then
+if docker compose exec -T mongo1 mongosh --username admin --password password123 --authenticationDatabase admin --eval "db.adminCommand('ping')" --quiet > /dev/null; then
     log_success "MongoDB is accessible"
 else
     log_error "MongoDB is not accessible"

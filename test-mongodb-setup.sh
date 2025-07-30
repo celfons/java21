@@ -46,16 +46,16 @@ docker compose up -d mongo1 mongo2 mongo3 mongo-init
 log_info "Waiting for MongoDB services to be healthy..."
 timeout 300 bash -c '
     while true; do
-        # Check MongoDB health
-        mongo1_health=$(docker compose ps mongo1 --format json | jq -r ".[0].Health // \"unknown\"")
-        mongo2_health=$(docker compose ps mongo2 --format json | jq -r ".[0].Health // \"unknown\"")
-        mongo3_health=$(docker compose ps mongo3 --format json | jq -r ".[0].Health // \"unknown\"")
+        # Check MongoDB health using simple docker compose ps
+        mongo1_status=$(docker compose ps mongo1 --format "table {{.Status}}" | tail -n +2)
+        mongo2_status=$(docker compose ps mongo2 --format "table {{.Status}}" | tail -n +2)
+        mongo3_status=$(docker compose ps mongo3 --format "table {{.Status}}" | tail -n +2)
         # Check mongo-init completion
-        mongo_init_state=$(docker compose ps mongo-init --format json | jq -r ".[0].State // \"unknown\"")
+        mongo_init_status=$(docker compose ps mongo-init --format "table {{.Status}}" 2>/dev/null | tail -n +2 || echo "not_found")
         
-        echo "MongoDB1: $mongo1_health, MongoDB2: $mongo2_health, MongoDB3: $mongo3_health, mongo-init: $mongo_init_state"
+        echo "MongoDB1: $mongo1_status, MongoDB2: $mongo2_status, MongoDB3: $mongo3_status, mongo-init: $mongo_init_status"
         
-        if [ "$mongo1_health" = "healthy" ] && [ "$mongo2_health" = "healthy" ] && [ "$mongo3_health" = "healthy" ] && [ "$mongo_init_state" = "exited" ]; then
+        if echo "$mongo1_status" | grep -q "healthy" && echo "$mongo2_status" | grep -q "healthy" && echo "$mongo3_status" | grep -q "healthy" && echo "$mongo_init_status" | grep -q "Exited (0)"; then
             echo "MongoDB services are ready!"
             break
         fi

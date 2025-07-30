@@ -24,7 +24,7 @@ services:
       interval: ${HEALTH_CHECK_INTERVAL:-30s}
       timeout: ${HEALTH_CHECK_TIMEOUT:-15s}
       retries: ${HEALTH_CHECK_RETRIES:-5}
-      start_period: ${HEALTH_CHECK_START_PERIOD:-60s}
+      start_period: ${HEALTH_CHECK_START_PERIOD:-120s}
 
   # MongoDB Replica Set - Secondary 1
   mongo2:
@@ -46,7 +46,7 @@ services:
       interval: ${HEALTH_CHECK_INTERVAL:-30s}
       timeout: ${HEALTH_CHECK_TIMEOUT:-15s}
       retries: ${HEALTH_CHECK_RETRIES:-5}
-      start_period: ${HEALTH_CHECK_START_PERIOD:-60s}
+      start_period: ${HEALTH_CHECK_START_PERIOD:-120s}
 
   # MongoDB Replica Set - Secondary 2
   mongo3:
@@ -70,7 +70,7 @@ services:
       interval: ${HEALTH_CHECK_INTERVAL:-30s}
       timeout: ${HEALTH_CHECK_TIMEOUT:-15s}
       retries: ${HEALTH_CHECK_RETRIES:-5}
-      start_period: ${HEALTH_CHECK_START_PERIOD:-60s}
+      start_period: ${HEALTH_CHECK_START_PERIOD:-120s}
 
   # MongoDB Replica Set Initializer
   mongo-init:
