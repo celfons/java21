@@ -19,6 +19,7 @@ backups/
 # Logs
 *.log
 logs/
+startup-*.log
 
 # Temporary files
 tmp/
