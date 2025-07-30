@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # MongoDB Replica Set - Primary
   mongo1:
@@ -7,9 +5,6 @@ services:
     container_name: mongo1
     restart: unless-stopped
     command: mongod --replSet ${MONGO_REPLICA_SET_NAME:-rs0} --bind_ip_all --port 27017
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME:-admin}
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:-password123}
     ports:
       - "27017:27017"
     volumes:
@@ -22,10 +17,10 @@ services:
     networks:
       - kafka-mongodb-network
     healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      test: ["CMD", "bash", "-c", "mongosh --host localhost:27017 --eval 'db.adminCommand(\"ping\")' --quiet || exit 1"]
       interval: ${HEALTH_CHECK_INTERVAL:-30s}
-      timeout: ${HEALTH_CHECK_TIMEOUT:-10s}
-      retries: ${HEALTH_CHECK_RETRIES:-3}
+      timeout: ${HEALTH_CHECK_TIMEOUT:-15s}
+      retries: ${HEALTH_CHECK_RETRIES:-5}
       start_period: 60s
 
   # MongoDB Replica Set - Secondary 1
@@ -34,9 +29,6 @@ services:
     container_name: mongo2
     restart: unless-stopped
     command: mongod --replSet ${MONGO_REPLICA_SET_NAME:-rs0} --bind_ip_all --port 27017
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME:-admin}
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:-password123}
     ports:
       - "27018:27017"
     volumes:
@@ -47,10 +39,10 @@ services:
       mongo1:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      test: ["CMD", "bash", "-c", "mongosh --host localhost:27017 --eval 'db.adminCommand(\"ping\")' --quiet || exit 1"]
       interval: ${HEALTH_CHECK_INTERVAL:-30s}
-      timeout: ${HEALTH_CHECK_TIMEOUT:-10s}
-      retries: ${HEALTH_CHECK_RETRIES:-3}
+      timeout: ${HEALTH_CHECK_TIMEOUT:-15s}
+      retries: ${HEALTH_CHECK_RETRIES:-5}
       start_period: 60s
 
   # MongoDB Replica Set - Secondary 2
@@ -59,9 +51,6 @@ services:
     container_name: mongo3
     restart: unless-stopped
     command: mongod --replSet ${MONGO_REPLICA_SET_NAME:-rs0} --bind_ip_all --port 27017
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME:-admin}
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:-password123}
     ports:
       - "27019:27017"
     volumes:
@@ -72,11 +61,51 @@ services:
       mongo1:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      test: ["CMD", "bash", "-c", "mongosh --host localhost:27017 --eval 'db.adminCommand(\"ping\")' --quiet || exit 1"]
       interval: ${HEALTH_CHECK_INTERVAL:-30s}
-      timeout: ${HEALTH_CHECK_TIMEOUT:-10s}
-      retries: ${HEALTH_CHECK_RETRIES:-3}
+      timeout: ${HEALTH_CHECK_TIMEOUT:-15s}
+      retries: ${HEALTH_CHECK_RETRIES:-5}
       start_period: 60s
+
+  # MongoDB Replica Set Initializer
+  mongo-init:
+    image: mongo:latest
+    container_name: mongo-init
+    depends_on:
+      mongo1:
+        condition: service_healthy
+      mongo2:
+        condition: service_healthy
+      mongo3:
+        condition: service_healthy
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME:-admin}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:-password123}
+      MONGO_REPLICA_SET_NAME: ${MONGO_REPLICA_SET_NAME:-rs0}
+      MONGO_INIT_MAX_ATTEMPTS: ${MONGO_INIT_MAX_ATTEMPTS:-60}
+      MONGO_INIT_SLEEP_INTERVAL: ${MONGO_INIT_SLEEP_INTERVAL:-5}
+    volumes:
+      - ./scripts/init-replica.sh:/tmp/init-replica.sh
+      - ./config/mongodb/replica-init.js:/tmp/replica-init.js
+    networks:
+      - kafka-mongodb-network
+    command: |
+      bash -c "
+        echo 'Waiting for MongoDB instances to be ready...'
+        sleep 10
+        
+        echo 'Testing MongoDB connections...'
+        mongosh --host mongo1:27017 --eval 'db.adminCommand(\"ping\")' --quiet
+        mongosh --host mongo2:27017 --eval 'db.adminCommand(\"ping\")' --quiet
+        mongosh --host mongo3:27017 --eval 'db.adminCommand(\"ping\")' --quiet
+        
+        echo 'Initializing replica set...'
+        mongosh --host mongo1:27017 --file /tmp/replica-init.js
+        
+        echo 'Replica set initialization completed'
+        sleep 5
+      "
+    restart: "no"
 
   # Zookeeper for Kafka coordination
   zookeeper:
@@ -144,8 +173,8 @@ services:
     depends_on:
       kafka:
         condition: service_healthy
-      mongo1:
-        condition: service_healthy
+      mongo-init:
+        condition: service_completed_successfully
     environment:
       CONNECT_BOOTSTRAP_SERVERS: ${CONNECT_BOOTSTRAP_SERVERS:-kafka:9092}
       CONNECT_REST_ADVERTISED_HOST_NAME: kafka-connect
@@ -171,11 +200,11 @@ services:
     networks:
       - kafka-mongodb-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8083/connectors"]
+      test: ["CMD", "bash", "-c", "curl -f http://localhost:8083/connectors && curl -f http://localhost:8083/connector-plugins | grep -q mongodb"]
       interval: ${HEALTH_CHECK_INTERVAL:-30s}
-      timeout: ${HEALTH_CHECK_TIMEOUT:-10s}
-      retries: ${HEALTH_CHECK_RETRIES:-3}
-      start_period: 120s
+      timeout: ${HEALTH_CHECK_TIMEOUT:-15s}
+      retries: ${HEALTH_CHECK_RETRIES:-10}
+      start_period: 180s
 
   # Kafka UI for monitoring
   kafka-ui:
@@ -183,7 +212,7 @@ services:
     container_name: kafka-ui
     restart: unless-stopped
     depends_on:
-      kafka:
+      kafka-connect:
         condition: service_healthy
     environment:
       KAFKA_CLUSTERS_0_NAME: local
@@ -199,7 +228,7 @@ services:
       interval: ${HEALTH_CHECK_INTERVAL:-30s}
       timeout: ${HEALTH_CHECK_TIMEOUT:-10s}
       retries: ${HEALTH_CHECK_RETRIES:-3}
-      start_period: 30s
+      start_period: 60s
 
   # MongoDB Express for database administration
   mongo-express:
@@ -207,12 +236,12 @@ services:
     container_name: mongo-express
     restart: unless-stopped
     depends_on:
-      mongo1:
-        condition: service_healthy
+      mongo-init:
+        condition: service_completed_successfully
     environment:
       ME_CONFIG_MONGODB_ADMINUSERNAME: ${MONGO_INITDB_ROOT_USERNAME:-admin}
       ME_CONFIG_MONGODB_ADMINPASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:-password123}
-      ME_CONFIG_MONGODB_URL: mongodb://${MONGO_INITDB_ROOT_USERNAME:-admin}:${MONGO_INITDB_ROOT_PASSWORD:-password123}@mongo1:27017/?authSource=admin
+      ME_CONFIG_MONGODB_URL: mongodb://admin:password123@mongo1:27017,mongo2:27017,mongo3:27017/?authSource=admin&replicaSet=${MONGO_REPLICA_SET_NAME:-rs0}
       ME_CONFIG_BASICAUTH_USERNAME: admin
       ME_CONFIG_BASICAUTH_PASSWORD: admin
     ports:
@@ -220,11 +249,11 @@ services:
     networks:
       - kafka-mongodb-network
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8081"]
+      test: ["CMD", "wget", "--spider", "-q", "--timeout=5", "http://localhost:8081"]
       interval: ${HEALTH_CHECK_INTERVAL:-30s}
       timeout: ${HEALTH_CHECK_TIMEOUT:-10s}
       retries: ${HEALTH_CHECK_RETRIES:-3}
-      start_period: 30s
+      start_period: 60s
 
 networks:
   kafka-mongodb-network:
