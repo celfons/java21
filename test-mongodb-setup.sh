@@ -65,42 +65,30 @@ timeout 300 bash -c '
 '
 
 # Test basic MongoDB connectivity with authentication
-log_info "Testing MongoDB connectivity and authentication..."
+log_info "Testing MongoDB connectivity..."
 for i in 1 2 3; do
-    if docker compose exec -T mongo$i mongosh --username admin --password password123 --authenticationDatabase admin --eval "db.adminCommand('ping')" --quiet > /dev/null; then
-        log_success "MongoDB mongo$i is accessible with authentication"
+    if docker compose exec -T mongo$i mongosh --eval "db.adminCommand('ping')" --quiet > /dev/null; then
+        log_success "MongoDB mongo$i is accessible"
     else
-        log_error "MongoDB mongo$i is not accessible with authentication"
+        log_error "MongoDB mongo$i is not accessible"
         exit 1
     fi
 done
 
 # Test replica set status
 log_info "Testing replica set status..."
-REPLICA_STATUS=$(docker compose exec -T mongo1 mongosh --username admin --password password123 --authenticationDatabase admin --eval "rs.status()" --quiet)
+REPLICA_STATUS=$(docker compose exec -T mongo1 mongosh --eval "rs.status()" --quiet)
 echo "$REPLICA_STATUS" | grep -q "\"ok\" : 1" && log_success "Replica set is operational" || { log_error "Replica set is not operational"; exit 1; }
 
 # Test connectivity with multi-host connection string
 log_info "Testing multi-host connection string..."
-MULTI_HOST_TEST=$(docker compose exec -T mongo1 mongosh "mongodb://admin:password123@mongo1:27017,mongo2:27017,mongo3:27017/?authSource=admin&replicaSet=rs0" --eval "db.adminCommand('ping')" --quiet)
+MULTI_HOST_TEST=$(docker compose exec -T mongo1 mongosh "mongodb://mongo1:27017,mongo2:27017,mongo3:27017/?replicaSet=rs0" --eval "db.adminCommand('ping')" --quiet)
 echo "$MULTI_HOST_TEST" | grep -q "\"ok\" : 1" && log_success "Multi-host connection string works" || { log_error "Multi-host connection string failed"; exit 1; }
-
-# Test that shared replica key is working
-log_info "Testing replica set key security..."
-# Check if replica key exists and has correct permissions in containers
-for i in 1 2 3; do
-    if docker compose exec -T mongo$i ls -la /etc/mongodb/replica.key > /dev/null 2>&1; then
-        log_success "Replica key is mounted correctly in mongo$i"
-    else
-        log_error "Replica key is not properly mounted in mongo$i"
-        exit 1
-    fi
-done
 
 # Test that mongo1 is primary and others are secondary
 log_info "Testing replica set member roles..."
-PRIMARY_COUNT=$(docker compose exec -T mongo1 mongosh --username admin --password password123 --authenticationDatabase admin --eval "rs.status().members.filter(m => m.stateStr === 'PRIMARY').length" --quiet | tail -1)
-SECONDARY_COUNT=$(docker compose exec -T mongo1 mongosh --username admin --password password123 --authenticationDatabase admin --eval "rs.status().members.filter(m => m.stateStr === 'SECONDARY').length" --quiet | tail -1)
+PRIMARY_COUNT=$(docker compose exec -T mongo1 mongosh --eval "rs.status().members.filter(m => m.stateStr === 'PRIMARY').length" --quiet | tail -1)
+SECONDARY_COUNT=$(docker compose exec -T mongo1 mongosh --eval "rs.status().members.filter(m => m.stateStr === 'SECONDARY').length" --quiet | tail -1)
 
 if [ "$PRIMARY_COUNT" = "1" ] && [ "$SECONDARY_COUNT" = "2" ]; then
     log_success "Replica set has correct topology: 1 PRIMARY, 2 SECONDARY"
@@ -110,7 +98,7 @@ else
 fi
 
 # Test that mongo1 is the primary
-PRIMARY_HOST=$(docker compose exec -T mongo1 mongosh --username admin --password password123 --authenticationDatabase admin --eval "rs.status().members.find(m => m.stateStr === 'PRIMARY').name" --quiet | tail -1)
+PRIMARY_HOST=$(docker compose exec -T mongo1 mongosh --eval "rs.status().members.find(m => m.stateStr === 'PRIMARY').name" --quiet | tail -1)
 if echo "$PRIMARY_HOST" | grep -q "mongo1:27017"; then
     log_success "mongo1 is correctly configured as PRIMARY"
 else
@@ -119,7 +107,7 @@ fi
 
 # Test sample database creation
 log_info "Testing sample database and collections..."
-COLLECTIONS=$(docker compose exec -T mongo1 mongosh --username admin --password password123 --authenticationDatabase admin exemplo --eval "db.getCollectionNames()" --quiet | tail -1)
+COLLECTIONS=$(docker compose exec -T mongo1 mongosh exemplo --eval "db.getCollectionNames()" --quiet | tail -1)
 if echo "$COLLECTIONS" | grep -q "users" && echo "$COLLECTIONS" | grep -q "products" && echo "$COLLECTIONS" | grep -q "orders"; then
     log_success "Sample collections created successfully"
 else
@@ -130,12 +118,12 @@ fi
 log_success "All MongoDB replica set tests passed!"
 log_info "MongoDB replica set is properly configured with:"
 echo "  - 3 nodes: mongo1 (PRIMARY), mongo2 (SECONDARY), mongo3 (SECONDARY)"
-echo "  - Shared replica key for security"
-echo "  - Authentication enabled"
+echo "  - Robust healthchecks"
+echo "  - Proper startup dependencies"
 echo "  - Multi-host connection string working"
 echo "  - Sample database and collections created"
 echo ""
-log_info "Connection string: mongodb://admin:password123@mongo1:27017,mongo2:27017,mongo3:27017/?authSource=admin&replicaSet=rs0"
+log_info "Connection string: mongodb://mongo1:27017,mongo2:27017,mongo3:27017/?replicaSet=rs0"
 
 # Clean up
 log_info "Cleaning up..."

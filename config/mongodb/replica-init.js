@@ -188,5 +188,5 @@ if (!success && attempts >= maxAttempts) {
     print("  - mongo2:27017 (SECONDARY, priority: 1)");
     print("  - mongo3:27017 (SECONDARY, priority: 1)");
     print("Database 'exemplo' created with sample collections and indexes");
-    print("Connection string: mongodb://admin:password123@mongo1:27017,mongo2:27017,mongo3:27017/?authSource=admin&replicaSet=rs0");
+    print("Connection string: mongodb://mongo1:27017,mongo2:27017,mongo3:27017/?replicaSet=rs0");
 }

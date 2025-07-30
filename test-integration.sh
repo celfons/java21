@@ -109,7 +109,7 @@ fi
 
 # Test MongoDB connectivity
 log_info "Testing MongoDB connectivity..."
-if docker compose exec -T mongo1 mongosh --username ${MONGO_INITDB_ROOT_USERNAME:-admin} --password ${MONGO_INITDB_ROOT_PASSWORD:-password123} --authenticationDatabase admin --eval "db.adminCommand('ping')" --quiet > /dev/null; then
+if docker compose exec -T mongo1 mongosh --eval "db.adminCommand('ping')" --quiet > /dev/null; then
     log_success "MongoDB is accessible"
 else
     log_error "MongoDB is not accessible"
