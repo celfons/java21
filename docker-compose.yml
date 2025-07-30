@@ -5,6 +5,9 @@ services:
     container_name: mongo1
     restart: unless-stopped
     command: mongod --replSet ${MONGO_REPLICA_SET_NAME:-rs0} --bind_ip_all --port 27017
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME:-admin}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:-password123}
     ports:
       - "27017:27017"
     volumes:
@@ -59,6 +62,8 @@ services:
       - kafka-mongodb-network
     depends_on:
       mongo1:
+        condition: service_healthy
+      mongo2:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "bash", "-c", "mongosh --host localhost:27017 --eval 'db.adminCommand(\"ping\")' --quiet || exit 1"]
@@ -241,7 +246,7 @@ services:
     environment:
       ME_CONFIG_MONGODB_ADMINUSERNAME: ${MONGO_INITDB_ROOT_USERNAME:-admin}
       ME_CONFIG_MONGODB_ADMINPASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:-password123}
-      ME_CONFIG_MONGODB_URL: mongodb://admin:password123@mongo1:27017,mongo2:27017,mongo3:27017/?authSource=admin&replicaSet=${MONGO_REPLICA_SET_NAME:-rs0}
+      ME_CONFIG_MONGODB_URL: mongodb://mongo1:27017,mongo2:27017,mongo3:27017/?replicaSet=${MONGO_REPLICA_SET_NAME:-rs0}
       ME_CONFIG_BASICAUTH_USERNAME: admin
       ME_CONFIG_BASICAUTH_PASSWORD: admin
     ports:

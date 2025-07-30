@@ -35,6 +35,20 @@ try {
         status.members.forEach(function(member) {
             print("  - " + member.name + " (" + member.stateStr + ")");
         });
+        
+        // Verify all members are present
+        var expectedMembers = ["mongo1:27017", "mongo2:27017", "mongo3:27017"];
+        var actualMembers = status.members.map(function(m) { return m.name; });
+        var allMembersPresent = expectedMembers.every(function(expected) {
+            return actualMembers.includes(expected);
+        });
+        
+        if (allMembersPresent && status.members.length === 3) {
+            print("All three members are present. Replica set setup is complete.");
+            quit(0);
+        } else {
+            print("Warning: Not all expected members are present. Continuing with reconfiguration...");
+        }
     }
 } catch (error) {
     print("Replica set not initialized yet, proceeding with initialization...");
@@ -68,24 +82,40 @@ while (attempts < maxAttempts && !success) {
         if (status.ok === 1) {
             var primaryFound = false;
             var healthyMembers = 0;
+            var expectedMembers = ["mongo1:27017", "mongo2:27017", "mongo3:27017"];
+            var actualMembers = [];
             
             print("Replica set status check #" + (attempts + 1) + ":");
             status.members.forEach(function(member) {
                 print("  - " + member.name + ": " + member.stateStr + " (health: " + member.health + ")");
+                actualMembers.push(member.name);
                 if (member.stateStr === "PRIMARY") {
                     primaryFound = true;
+                    if (member.name === "mongo1:27017") {
+                        print("  ✓ mongo1 is PRIMARY as expected");
+                    } else {
+                        print("  ! Primary is not mongo1, but " + member.name);
+                    }
                 }
                 if (member.health === 1) {
                     healthyMembers++;
                 }
             });
             
-            if (primaryFound && healthyMembers >= 2) {
-                print("Replica set is ready with primary and healthy members");
+            // Check if all expected members are present
+            var allMembersPresent = expectedMembers.every(function(expected) {
+                return actualMembers.includes(expected);
+            });
+            
+            if (primaryFound && healthyMembers >= 2 && allMembersPresent && status.members.length === 3) {
+                print("Replica set is ready with primary and all healthy members");
                 success = true;
                 break;
             } else {
-                print("Waiting for primary election and healthy members... (" + healthyMembers + "/3 healthy)");
+                print("Waiting for replica set readiness...");
+                print("  - Primary found: " + primaryFound);
+                print("  - Healthy members: " + healthyMembers + "/3");
+                print("  - All members present: " + allMembersPresent + " (" + actualMembers.length + "/3)");
             }
         } else {
             print("Replica set status not OK: " + JSON.stringify(status));
@@ -107,31 +137,9 @@ if (!success && attempts >= maxAttempts) {
     } catch (error) {
         print("Could not get final status: " + error);
     }
+    quit(1);
 } else {
     print("✓ Replica set initialization completed successfully");
-    
-    // Create admin user for authentication
-    try {
-        print("Creating admin user...");
-        db = db.getSiblingDB('admin');
-        
-        // Check if admin user already exists
-        var adminUser = db.getUser("admin");
-        if (!adminUser) {
-            db.createUser({
-                user: "admin",
-                pwd: "password123",
-                roles: [
-                    { role: "root", db: "admin" }
-                ]
-            });
-            print("✓ Admin user created successfully");
-        } else {
-            print("✓ Admin user already exists");
-        }
-    } catch (error) {
-        print("Warning: Could not create admin user: " + error);
-    }
     
     // Create application database and collections
     try {
@@ -180,5 +188,5 @@ if (!success && attempts >= maxAttempts) {
     print("  - mongo2:27017 (SECONDARY, priority: 1)");
     print("  - mongo3:27017 (SECONDARY, priority: 1)");
     print("Database 'exemplo' created with sample collections and indexes");
-    print("Admin user created: admin/password123");
+    print("Connection string: mongodb://mongo1:27017,mongo2:27017,mongo3:27017/?replicaSet=rs0");
 }

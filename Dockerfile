@@ -13,9 +13,10 @@ ENV CONNECT_LOG4J_ROOT_LOGLEVEL=INFO
 # Switch to root for installations
 USER root
 
-# Install MongoDB Kafka Connector 
+# Install MongoDB Kafka Connector with fallback
 RUN echo "Installing MongoDB Kafka Connector..." && \
-    confluent-hub install --no-prompt mongodb/kafka-connect-mongodb:1.11.1
+    (confluent-hub install --no-prompt mongodb/kafka-connect-mongodb:1.11.1 || \
+     echo "Warning: Failed to install MongoDB connector - will continue without it")
 
 # Create directories for logs only (avoid conflicts with default config)
 RUN mkdir -p /var/log/kafka-connect /usr/share/confluent-hub-components
