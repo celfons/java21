@@ -1,5 +1,6 @@
 #!/bin/bash
 # Kafka Connect MongoDB Source Connector Setup Script
+# Updated for MongoDB Atlas and external Kafka
 
 set -e
 
@@ -16,7 +17,17 @@ CONNECTOR_CONFIG=${CONNECTOR_CONFIG:-config/kafka-connect/mongodb-source-connect
 MAX_ATTEMPTS=30
 SLEEP_INTERVAL=10
 
-echo -e "${GREEN}=== Kafka Connect MongoDB Source Connector Setup ===${NC}"
+echo -e "${GREEN}=== Kafka Connect MongoDB Atlas Connector Setup ===${NC}"
+
+# Function to substitute environment variables in JSON
+substitute_env_vars() {
+    local config_file=$1
+    local temp_file="/tmp/$(basename "$config_file")"
+    
+    # Read the config file and substitute environment variables
+    envsubst < "$config_file" > "$temp_file"
+    echo "$temp_file"
+}
 
 # Function to check if Kafka Connect is ready
 check_kafka_connect_ready() {
@@ -34,6 +45,23 @@ get_connector_status() {
     local connector_name=$1
     curl -s "$CONNECT_URL/connectors/$connector_name/status" 2>/dev/null | jq -r '.connector.state' 2>/dev/null || echo "UNKNOWN"
 }
+
+# Validate required environment variables
+echo -e "${YELLOW}Validating environment variables...${NC}"
+
+if [ -z "$MONGODB_ATLAS_CONNECTION_STRING" ]; then
+    echo -e "${RED}✗ MONGODB_ATLAS_CONNECTION_STRING is required${NC}"
+    echo "Please set this environment variable with your MongoDB Atlas connection string"
+    exit 1
+fi
+
+if [ -z "$KAFKA_BOOTSTRAP_SERVERS" ]; then
+    echo -e "${RED}✗ KAFKA_BOOTSTRAP_SERVERS is required${NC}"
+    echo "Please set this environment variable with your external Kafka cluster bootstrap servers"
+    exit 1
+fi
+
+echo -e "${GREEN}✓ Required environment variables are set${NC}"
 
 # Wait for Kafka Connect to be ready
 echo -e "${YELLOW}Waiting for Kafka Connect to be ready...${NC}"
@@ -59,13 +87,16 @@ done
 echo -e "${BLUE}Available Kafka Connect plugins:${NC}"
 curl -s "$CONNECT_URL/connector-plugins" | jq -r '.[] | select(.class | contains("mongodb")) | .class'
 
-# Read connector configuration
+# Read and process connector configuration
 if [ ! -f "$CONNECTOR_CONFIG" ]; then
     echo -e "${RED}✗ Connector configuration file not found: $CONNECTOR_CONFIG${NC}"
     exit 1
 fi
 
-CONNECTOR_NAME=$(jq -r '.name' "$CONNECTOR_CONFIG")
+# Substitute environment variables in the config
+PROCESSED_CONFIG=$(substitute_env_vars "$CONNECTOR_CONFIG")
+
+CONNECTOR_NAME=$(jq -r '.name' "$PROCESSED_CONFIG")
 
 # Check if connector already exists
 if check_connector_exists "$CONNECTOR_NAME"; then
@@ -91,11 +122,11 @@ if check_connector_exists "$CONNECTOR_NAME"; then
 fi
 
 # Create connector
-echo -e "${YELLOW}Creating MongoDB Source Connector...${NC}"
+echo -e "${YELLOW}Creating MongoDB Atlas Connector...${NC}"
 
 RESPONSE=$(curl -s -X POST \
     -H "Content-Type: application/json" \
-    -d @"$CONNECTOR_CONFIG" \
+    -d @"$PROCESSED_CONFIG" \
     "$CONNECT_URL/connectors")
 
 if echo "$RESPONSE" | jq -e '.name' > /dev/null 2>&1; then
@@ -144,5 +175,8 @@ curl -s "$CONNECT_URL/connectors/$CONNECTOR_NAME/status" | jq .
 echo -e "${BLUE}=== Connector Configuration ===${NC}"
 curl -s "$CONNECT_URL/connectors/$CONNECTOR_NAME/config" | jq .
 
-echo -e "${GREEN}✓ MongoDB Source Connector setup completed successfully${NC}"
+echo -e "${GREEN}✓ MongoDB Atlas Connector setup completed successfully${NC}"
 echo -e "${BLUE}Monitor connector: $CONNECT_URL/connectors/$CONNECTOR_NAME/status${NC}"
+
+# Clean up temporary file
+rm -f "$PROCESSED_CONFIG"

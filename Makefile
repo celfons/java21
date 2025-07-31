@@ -1,8 +1,8 @@
-.PHONY: help build up down setup logs status clean test sample-data azure-env azure-build azure-test-local azure-logs azure-stop azure-validate
+.PHONY: help build up down setup logs status clean test setup-connector setup-multi-connectors azure-env azure-build azure-test-local azure-logs azure-stop azure-validate
 
 # Default target
 help: ## Show this help message
-	@echo "MongoDB Kafka Connector Example - Available Commands:"
+	@echo "MongoDB Atlas Kafka Connector Example - Available Commands:"
 	@echo ""
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
@@ -11,20 +11,23 @@ help: ## Show this help message
 	@if [ ! -f .env ]; then \
 		echo "Creating .env file from .env.example..."; \
 		cp .env.example .env; \
-		echo "Please review and modify .env file as needed"; \
+		echo "⚠️  IMPORTANT: Please configure MongoDB Atlas and Kafka connection strings in .env file"; \
+		echo "   - Set MONGODB_ATLAS_CONNECTION_STRING with your Atlas cluster connection string"; \
+		echo "   - Set KAFKA_BOOTSTRAP_SERVERS with your external Kafka cluster bootstrap servers"; \
 	fi
 
 # Build Docker images
-build: ## Build custom Docker images
+build: ## Build custom Kafka Connect image
 	@echo "Building custom Kafka Connect image..."
 	docker compose build kafka-connect
 
-# Start all services
-up: .env ## Start all services with Docker Compose
-	@echo "Starting MongoDB Kafka Connector Example..."
+# Start services (only Kafka Connect)
+up: .env ## Start Kafka Connect service with Docker Compose
+	@echo "Starting MongoDB Atlas Kafka Connect..."
+	@echo "ℹ️  This will only start Kafka Connect - it connects to external Atlas and Kafka"
 	docker compose up -d
 	@echo ""
-	@echo "Services starting up. Use 'make logs' to monitor progress."
+	@echo "Service starting up. Use 'make logs' to monitor progress."
 	@echo "Use 'make status' to check service health."
 
 # Stop all services
@@ -32,44 +35,36 @@ down: ## Stop all services
 	@echo "Stopping all services..."
 	docker compose down
 
-# Complete setup process
-setup: .env build up ## Complete setup: build, start services, initialize replica set, and setup connector
-	@echo "Performing complete setup..."
-	@echo "Waiting for services to start..."
+# Complete setup process for Atlas
+setup: .env build up ## Complete setup: build, start Kafka Connect, and setup Atlas connector
+	@echo "Performing Atlas setup..."
+	@echo "Waiting for Kafka Connect to start..."
 	@sleep 30
-	@echo "Initializing MongoDB replica set..."
-	@docker compose exec -T mongo1 mongosh --file /docker-entrypoint-initdb.d/replica-init.js
-	@echo "Waiting for replica set to stabilize..."
-	@sleep 20
-	@echo "Setting up Kafka Connect MongoDB Source Connector..."
+	@echo "Setting up MongoDB Atlas Connector..."
 	@./scripts/setup-connector.sh
 	@echo ""
-	@echo "✅ Setup completed successfully!"
+	@echo "✅ Atlas setup completed successfully!"
 	@echo ""
 	@make status
 
-# Setup multiple filtered connectors
+# Setup multiple filtered connectors for Atlas
 setup-multi-connectors: ## Setup multiple connectors with operation filtering (insert, update, delete)
-	@echo "Setting up multiple MongoDB Kafka connectors with operation filtering..."
+	@echo "Setting up multiple MongoDB Atlas Kafka connectors with operation filtering..."
 	@./scripts/setup-multi-connectors.sh
 
+# Setup single connector for Atlas
+setup-connector: ## Setup single MongoDB Atlas connector
+	@echo "Setting up MongoDB Atlas connector..."
+	@./scripts/setup-connector.sh
+
 # View logs
-logs: ## Show logs for all services
-	docker compose logs -f
-
-logs-mongo: ## Show MongoDB logs
-	docker compose logs -f mongo1 mongo2 mongo3
-
-logs-kafka: ## Show Kafka logs
-	docker compose logs -f kafka zookeeper
-
-logs-connect: ## Show Kafka Connect logs
+logs: ## Show logs for Kafka Connect service
 	docker compose logs -f kafka-connect
 
 # Check service status
-status: ## Check the status of all services
-	@echo "Checking service status..."
-	@./scripts/health-check.sh
+status: ## Check the status of Kafka Connect service
+	@echo "Checking Kafka Connect status..."
+	@./scripts/health-check-atlas.sh
 
 # Clean up everything
 clean: down ## Stop services and remove volumes
@@ -78,123 +73,46 @@ clean: down ## Stop services and remove volumes
 	@echo "Pruning unused Docker resources..."
 	docker system prune -f
 
-# Run tests
-test: ## Run health checks and basic tests
-	@echo "Running health checks..."
-	@./scripts/health-check.sh
-	@echo ""
-	@echo "Testing Kafka topics..."
-	@docker compose exec -T kafka kafka-topics --bootstrap-server localhost:9092 --list
-	@echo ""
-	@echo "Testing Kafka Connect status..."
-	@curl -s http://localhost:8083/connectors | jq .
+# Run mock tests (no external dependencies)
+test: ## Run mock tests for Atlas configuration
+	@echo "Running mock tests for Atlas configuration..."
+	@./test-atlas-setup.sh
 
-# Insert sample data
-sample-data: ## Insert sample data into MongoDB
-	@echo "Inserting sample data..."
-	@docker compose exec -T mongo1 mongosh --file /tmp/sample-data.js
-	@echo "Sample data inserted successfully!"
+# Run Atlas health checks
+health-check: ## Run Atlas health checks
+	@echo "Running Atlas health checks..."
+	@./scripts/health-check-atlas.sh
 
-# TTL (Time To Live) Index Example
-ttl-setup: ## Setup TTL indexes for automatic document expiration
-	@echo "Setting up TTL indexes..."
-	@docker compose exec -T mongo1 mongosh --file /tmp/ttl-setup.js
-	@echo "TTL indexes setup completed!"
-
-ttl-sample-data: ## Insert sample data with TTL expiration
-	@echo "Inserting TTL sample data..."
-	@docker compose exec -T mongo1 mongosh --file /tmp/ttl-sample-data.js
-	@echo "TTL sample data inserted!"
-
-ttl-monitor: ## Monitor Change Streams for TTL expiration events
-	@echo "Starting TTL Change Stream monitor..."
-	@echo "Press Ctrl+C to stop monitoring"
-	@docker compose exec -T mongo1 mongosh --file /tmp/ttl-monitor.js
-
-ttl-demo: ttl-setup ttl-sample-data ## Complete TTL demo setup (indexes + sample data)
+# Development helpers for Atlas
+dev-setup: setup setup-connector ## Complete Atlas development setup
 	@echo ""
-	@echo "🚀 TTL Demo is ready!"
-	@echo ""
-	@echo "📊 What was created:"
-	@echo "  - TTL index on sessions.expiresAt (expires immediately when time reached)"
-	@echo "  - TTL index on user_tokens.createdAt (expires after 60 seconds)"
-	@echo "  - Sample session documents that expire in 30-150 seconds"
-	@echo "  - Sample token documents that expire after 60 seconds"
-	@echo ""
-	@echo "🔍 Next steps:"
-	@echo "  1. Monitor TTL events: make ttl-monitor"
-	@echo "  2. Watch Kafka topics: make monitor-topics" 
-	@echo "  3. Check Kafka UI: http://localhost:8080"
-	@echo ""
-	@echo "⏰ Note: MongoDB TTL background task runs every 60 seconds"
-
-# Development helpers
-dev-setup: setup sample-data ## Complete development setup with sample data
-	@echo ""
-	@echo "🚀 Development environment is ready!"
+	@echo "🚀 Atlas development environment is ready!"
 	@echo ""
 	@echo "📊 Access points:"
-	@echo "  - Kafka UI: http://localhost:8080"
-	@echo "  - MongoDB Express: http://localhost:8081"
 	@echo "  - Kafka Connect API: http://localhost:8083"
 	@echo ""
 	@echo "🔧 Useful commands:"
 	@echo "  - View logs: make logs"
 	@echo "  - Check status: make status"
-	@echo "  - Insert more data: make sample-data"
-	@echo "  - Try TTL example: make ttl-demo"
+	@echo "  - Setup multiple connectors: make setup-multi-connectors"
+	@echo "  - Health check: make health-check"
 
-# Monitor Kafka topics
-monitor-topics: ## Monitor Kafka topics for new messages
-	@echo "Monitoring Kafka topics (Ctrl+C to stop)..."
-	@docker compose exec kafka kafka-console-consumer \
-		--bootstrap-server localhost:9092 \
-		--topic mongodb.exemplo.users \
-		--from-beginning
-
-# Restart specific service
-restart-mongo: ## Restart MongoDB services
-	docker compose restart mongo1 mongo2 mongo3
-
-restart-kafka: ## Restart Kafka services
-	docker compose restart zookeeper kafka
-
-restart-connect: ## Restart Kafka Connect
+# Restart Kafka Connect service
+restart-connect: ## Restart Kafka Connect service
 	docker compose restart kafka-connect
 
 # Show service URLs
 urls: ## Show service access URLs
 	@echo "🌐 Service URLs:"
-	@echo "  - Kafka UI:        http://localhost:8080"
-	@echo "  - MongoDB Express: http://localhost:8081"
 	@echo "  - Kafka Connect:   http://localhost:8083"
 	@echo ""
 	@echo "📡 API Endpoints:"
 	@echo "  - Kafka Connect Status: curl http://localhost:8083/connectors"
-	@echo "  - MongoDB Health:       curl http://localhost:8081"
 
-# Backup and restore
-backup: ## Backup MongoDB data
-	@echo "Creating MongoDB backup..."
-	@mkdir -p backups
-	@docker compose exec -T mongo1 mongodump --host mongo1:27017 --out /tmp/backup
-	@docker cp mongo1:/tmp/backup ./backups/$(shell date +%Y%m%d_%H%M%S)
-	@echo "Backup completed!"
-
-restore: ## Restore MongoDB data (specify BACKUP_DIR=path)
-	@if [ -z "$(BACKUP_DIR)" ]; then \
-		echo "Please specify BACKUP_DIR=path"; \
-		exit 1; \
-	fi
-	@echo "Restoring MongoDB data from $(BACKUP_DIR)..."
-	@docker cp $(BACKUP_DIR) mongo1:/tmp/restore
-	@docker compose exec -T mongo1 mongorestore /tmp/restore
-	@echo "Restore completed!"
-
-# Production helpers
-prod-check: ## Run production readiness checks
-	@echo "Running production readiness checks..."
-	@./scripts/health-check.sh
+# Production helpers for Atlas
+prod-check: ## Run production readiness checks for Atlas setup
+	@echo "Running Atlas production readiness checks..."
+	@./scripts/health-check-atlas.sh
 	@echo ""
 	@echo "Checking resource usage..."
 	@docker stats --no-stream --format "table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}"
