@@ -149,35 +149,26 @@ make status
 - ❌ No actual data synchronization
 - ✅ Pure configuration and template validation
 
-# 4. Run health checks
-./scripts/health-check.sh
+## 📊 Features
 
-# 5. Verify connector setup
-curl http://localhost:8083/connectors | jq .
-```
+### Core Components
 
-##### Option 3: Manual Step-by-Step Testing
-```bash
-# 1. Start services
-docker compose up -d
+- ✅ **MongoDB Atlas Integration** - Connect to managed MongoDB clusters
+- ✅ **External Kafka Support** - Connect to any Kafka cluster or managed service
+- ✅ **Kafka Connect** - Containerized connector service
+- ✅ **Multiple Filtered Connectors** - Separate connectors for INSERT, UPDATE, DELETE operations
+- ✅ **Change Stream Support** - Real-time change capture from Atlas
+- ✅ **Health Monitoring** - Automated service health checks
+- ✅ **Mock Testing** - No external dependencies required for testing
 
-# 2. Wait for initialization (important!)
-sleep 60
+### Production Features
 
-# 3. Initialize MongoDB replica set
-docker compose exec -T mongo1 mongosh --file /docker-entrypoint-initdb.d/replica-init.js
-
-# 4. Setup Kafka Connect MongoDB Source Connector
-./scripts/setup-connector.sh
-
-# 5. Run comprehensive health checks
-./scripts/health-check.sh
-
-# 6. Test data insertion
-docker compose exec -T mongo1 mongosh --eval "
-  use testdb;
-  db.users.insertOne({name: 'Test User', email: 'test@example.com'});
-  db.users.find().forEach(printjson);
+- 🔒 **Security**: Environment-based configuration
+- 📊 **Monitoring**: Health checks and status endpoints
+- 🔄 **High Availability**: Works with Atlas replica sets
+- ⚡ **Performance**: Optimized connector configurations
+- 🚨 **Error Handling**: Dead letter queues
+- 📖 **Documentation**: Comprehensive Atlas setup guides
 "
 
 # 7. Check Kafka topics for messages
@@ -305,8 +296,8 @@ Each connector uses **MongoDB Change Stream** with aggregation pipeline to filte
 
 #### Option 1: Complete Setup (Recommended for new projects)
 ```bash
-# 1. Complete initial setup
-make dev-setup
+# 1. Complete initial Atlas setup
+make setup
 
 # 2. Setup multiple connectors with filters
 make setup-multi-connectors
@@ -314,7 +305,7 @@ make setup-multi-connectors
 
 #### Option 2: Multiple Connectors Only (For existing projects)
 ```bash
-# Setup only the filtered connectors (requires environment already started)
+# Setup only the filtered connectors (requires Kafka Connect already started)
 make setup-multi-connectors
 ```
 
@@ -471,8 +462,11 @@ After setup, the following topics will be created automatically:
 
 4. **Test specific operations**:
    ```bash
-   # Connect to MongoDB and perform manual operations
-   docker-compose exec mongo1 mongosh "mongodb://admin:password123@localhost:27017/exemplo?authSource=admin"
+   # Connect to MongoDB Atlas using your connection string
+   mongosh "${MONGODB_ATLAS_CONNECTION_STRING}"
+   
+   # Switch to your database
+   use exemplo
    
    # Insert document (will appear in mongo-insert.exemplo.*)
    db.users.insertOne({name: "Test Insert", email: "insert@test.com"})
@@ -483,14 +477,10 @@ After setup, the following topics will be created automatically:
    # Delete document (will appear in mongo-delete.exemplo.*)
    db.users.deleteOne({name: "Test Insert"})
    ```
+   
+   **Note**: You need `mongosh` installed locally or use MongoDB Atlas web interface.
 
 ### 🔍 Monitoring and Verification
-
-#### Via Kafka UI (Web Interface)
-- **URL**: http://localhost:8080
-- View messages in real-time
-- Analyze connector configuration
-- Monitor performance and metrics
 
 #### Via Kafka Connect API
 ```bash
@@ -507,12 +497,19 @@ curl -s http://localhost:8083/connectors/mongo-update-connector/status | jq
 curl -s http://localhost:8083/connectors/mongo-delete-connector/status | jq
 ```
 
+#### Via External Kafka Tools
+Use your existing Kafka monitoring tools or managed service interfaces to:
+- View messages in real-time
+- Monitor topic performance
+- Track consumer lag
+
 ### ⚠️ Important Notes
 
-1. **Change Streams**: Requires MongoDB in Replica Set mode (already configured in this project)
+1. **Change Streams**: Requires MongoDB Atlas cluster (automatically supports change streams)
 2. **Performance**: Multiple connectors consume more resources - monitor usage
 3. **Dead Letter Queues**: Each connector has its own DLQ for error handling
 4. **Topics**: Topics are created automatically when the first messages arrive
+5. **Atlas Connectivity**: Ensure Kafka Connect can reach your Atlas cluster
 
 ### 🎛️ Connector Customization
 
@@ -533,292 +530,74 @@ make setup-multi-connectors
 - Destination topics
 - Message formatting
 
-## 🕒 TTL (Time To Live) Index Example
+## 🌊 Real-time Change Streaming
 
-### Overview
+### MongoDB Atlas Change Streams
 
-This project includes a complete example of MongoDB **TTL (Time To Live) indexes** with **Change Streams** to capture document expiration events. TTL indexes automatically delete documents when they reach their expiration time, and these deletions are captured in real-time by Change Streams and forwarded to Kafka.
+MongoDB Atlas automatically supports change streams, which enable real-time monitoring of data changes. The Kafka Connect MongoDB Source Connector leverages these change streams to capture:
 
-### 🎯 What You'll Learn
+- **Document insertions** - New data added to collections
+- **Document updates** - Changes to existing documents  
+- **Document deletions** - Removed documents
+- **Collection operations** - Schema changes and collection events
 
-- How to create TTL indexes for automatic document expiration
-- How Change Streams capture TTL expiration events as delete operations
-- How the MongoDB Kafka Connector forwards TTL deletions to Kafka topics
-- Real-time monitoring of document lifecycle events
+### Change Stream Benefits with Atlas
 
-### 📋 TTL Example Components
+1. **🔄 Real-time Processing**: Sub-second latency for change detection
+2. **📊 Scalable**: Handles high-throughput change operations
+3. **🛡️ Reliable**: Built-in resumability and error handling
+4. **🎯 Filtered**: Use aggregation pipelines to filter specific changes
+5. **☁️ Managed**: No infrastructure maintenance required
 
-| Component | Description |
-|-----------|-------------|
-| **TTL Indexes** | Automatic document expiration based on date fields |
-| **Sample Data** | Sessions and tokens that expire at different intervals |
-| **Change Stream Monitor** | Real-time monitoring of TTL expiration events |
-| **Kafka Integration** | TTL deletions forwarded to Kafka topics |
+### Example Change Stream Message
 
-### 🚀 Quick Start - TTL Example
+When a document is inserted into MongoDB Atlas, the connector produces:
 
-```bash
-# 1. Start the environment (if not already running)
-make dev-setup
-
-# 2. Setup TTL indexes and insert sample data
-make ttl-demo
-
-# 3. Monitor TTL expiration events in real-time
-make ttl-monitor
-
-# 4. In another terminal, watch Kafka topics for TTL events
-make monitor-topics
-```
-
-### 📊 TTL Collections Created
-
-The example creates two collections with different TTL configurations:
-
-#### 1. Sessions Collection
-- **TTL Field**: `expiresAt`
-- **Expiration**: Documents expire when `expiresAt` time is reached
-- **Use Case**: User sessions, temporary data
-- **Sample Expiration**: 30-150 seconds (for demo purposes)
-
-```javascript
-// TTL Index
-db.sessions.createIndex(
-    { "expiresAt": 1 }, 
-    { expireAfterSeconds: 0 }
-)
-
-// Sample Document
-{
-    sessionId: "sess_demo_001",
-    userId: "user_123",
-    expiresAt: ISODate("2024-01-01T12:30:00Z"), // Expires at this exact time
-    isActive: true
-}
-```
-
-#### 2. User Tokens Collection
-- **TTL Field**: `createdAt`
-- **Expiration**: Documents expire 60 seconds after `createdAt`
-- **Use Case**: API tokens, temporary access keys
-- **Sample Expiration**: 60 seconds after creation
-
-```javascript
-// TTL Index
-db.user_tokens.createIndex(
-    { "createdAt": 1 }, 
-    { expireAfterSeconds: 60 }
-)
-
-// Sample Document
-{
-    tokenId: "token_api_001",
-    userId: "user_123", 
-    createdAt: ISODate("2024-01-01T12:00:00Z"), // Expires 60 seconds after this time
-    tokenType: "api_key"
-}
-```
-
-### 🔍 Monitoring TTL Expiration Events
-
-#### Via Change Stream Monitor
-```bash
-# Real-time monitoring of TTL deletions
-make ttl-monitor
-```
-
-**Sample Output:**
-```
-🗑️  TTL EXPIRATION EVENT #1
-   Time: 2024-01-01T12:30:01.000Z
-   Database: exemplo
-   Collection: sessions
-   Operation: delete
-   Document ID: {"_id": ObjectId("...") }
-   🕒 TTL Type: Session expiration (expiresAt field)
-```
-
-#### Via Kafka Topics
-TTL expiration events appear in Kafka topics as **delete operations**:
-
-```bash
-# Monitor Kafka topics for TTL events
-make monitor-topics
-
-# Or monitor specific delete operations
-docker-compose exec kafka kafka-console-consumer \
-    --bootstrap-server localhost:9092 \
-    --topic mongo-delete.exemplo.sessions \
-    --from-beginning
-```
-
-**Sample Kafka Message for TTL Expiration:**
 ```json
 {
-    "_id": {
-        "_data": "82644F2A8F000000012B0429296E1404"
-    },
-    "operationType": "delete",
-    "clusterTime": {
-        "$timestamp": {
-            "t": 1682951295,
-            "i": 1
-        }
-    },
-    "ns": {
-        "db": "exemplo",
-        "coll": "sessions"
-    },
-    "documentKey": {
-        "_id": {
-            "$oid": "644f2a8d1234567890abcdef"
-        }
-    }
+  "_id": {
+    "_data": "82644F2A8D000000012B0429296E1404"
+  },
+  "operationType": "insert",
+  "clusterTime": {
+    "$timestamp": {"t": 1682951293, "i": 1}
+  },
+  "ns": {
+    "db": "exemplo",
+    "coll": "users"
+  },
+  "documentKey": {
+    "_id": {"$oid": "644f2a8d1234567890abcdef"}
+  },
+  "fullDocument": {
+    "_id": {"$oid": "644f2a8d1234567890abcdef"},
+    "name": "João Silva",
+    "email": "joao@exemplo.com",
+    "createdAt": {"$date": "2023-05-01T12:34:56.789Z"}
+  }
 }
 ```
-
-### ⚙️ TTL Commands
-
-```bash
-# Setup TTL indexes only
-make ttl-setup
-
-# Insert TTL sample data only  
-make ttl-sample-data
-
-# Complete TTL demo (indexes + data)
-make ttl-demo
-
-# Monitor TTL expiration events
-make ttl-monitor
-
-# Monitor via Kafka UI (Web interface)
-# Visit: http://localhost:8080
-```
-
-### 📚 Understanding TTL Behavior
-
-#### TTL Background Process
-- MongoDB runs a background task **every 60 seconds** to remove expired documents
-- Documents may not be deleted exactly at expiration time (up to 60-second delay)
-- TTL deletions are captured by Change Streams as `delete` operations
-
-#### TTL vs Manual Deletion
-- **TTL Deletions**: Automatic, triggered by MongoDB's background process
-- **Manual Deletions**: Triggered by application code or user actions
-- **Both appear identically** in Change Streams as `delete` operations
-
-#### Change Stream Integration
-1. **TTL Index**: Marks documents for expiration
-2. **Background Task**: MongoDB deletes expired documents
-3. **Change Stream**: Captures deletion as `delete` operation
-4. **Kafka Connector**: Forwards event to Kafka topic
-5. **Consumers**: Process TTL expiration events
-
-### 🧪 Testing Scenarios
-
-#### Scenario 1: Immediate Expiration
-```bash
-# Insert document that expires in 30 seconds
-make ttl-sample-data
-
-# Monitor for expiration (wait 1-2 minutes)
-make ttl-monitor
-```
-
-#### Scenario 2: Continuous Expiration
-The sample data creates multiple documents that expire at different intervals, demonstrating:
-- Batch expiration events
-- Staggered expiration timing
-- Real-time Change Stream notifications
-
-#### Scenario 3: Kafka Integration
-```bash
-# Terminal 1: Monitor Change Streams
-make ttl-monitor
-
-# Terminal 2: Monitor Kafka topics
-make monitor-topics  
-
-# Terminal 3: Watch Kafka UI
-# Visit: http://localhost:8080
-```
-
-### 🔧 Customizing TTL Configuration
-
-#### Create Custom TTL Index
-```javascript
-// Expire documents 30 minutes after creation
-db.mycollection.createIndex(
-    { "createdAt": 1 },
-    { expireAfterSeconds: 1800 }
-)
-
-// Expire documents at specific time
-db.mycollection.createIndex(
-    { "expiresAt": 1 },
-    { expireAfterSeconds: 0 }
-)
-```
-
-#### Production TTL Examples
-```javascript
-// User sessions (30 minutes)
-db.sessions.createIndex(
-    { "lastActivity": 1 },
-    { expireAfterSeconds: 1800 }
-)
-
-// Email verification tokens (24 hours)
-db.verification_tokens.createIndex(
-    { "createdAt": 1 },
-    { expireAfterSeconds: 86400 }
-)
-
-// Audit logs (90 days)
-db.audit_logs.createIndex(
-    { "timestamp": 1 },
-    { expireAfterSeconds: 7776000 }
-)
-```
-
-### ⚠️ Important Notes
-
-1. **Replica Set Required**: TTL indexes work with Change Streams only in replica set mode
-2. **Background Task**: TTL cleanup runs every 60 seconds, not immediately
-3. **Index Limitations**: TTL field must be Date or array of Dates
-4. **Compound Indexes**: TTL setting only applies to first field in compound index
-5. **Performance**: TTL operations are lightweight but consider impact on large collections
-
-### 🎛️ Kafka Connect TTL Integration
-
-The MongoDB Kafka Connector automatically captures TTL expiration events:
-
-- **Topic Naming**: `mongodb.exemplo.sessions` (or with operation prefix if using filtered connectors)
-- **Message Format**: Standard MongoDB Change Stream delete event
-- **Filtering**: Use Change Stream pipelines to filter TTL events specifically
-- **Dead Letter Queue**: Failed TTL events are handled like other connector errors
 
 ## 🛠️ Available Commands
 
 ```bash
 # Essential commands
-make help                    # Show all available commands
-make status                  # Check service health
-make logs                    # View all service logs
+make help                     # Show all available commands
+make status                   # Check Kafka Connect health
+make logs                     # View Kafka Connect logs
 
 # Development
-make dev-setup              # Complete development setup
-make sample-data            # Insert test data
-make monitor-topics         # Watch Kafka messages
+make setup                    # Complete Atlas setup
+make setup-connector          # Setup single connector
+make setup-multi-connectors   # Setup multiple filtered connectors
 
-# Connector Management
-make setup-multi-connectors # Setup multiple filtered connectors (INSERT, UPDATE, DELETE)
+# Testing and Health
+make test                     # Run mock configuration tests
+make health-check             # Run Atlas health checks
 
 # Management
-make clean                  # Clean up everything
-make backup                 # Backup MongoDB data
-make restart-*              # Restart specific services
+make clean                    # Clean up everything
+make restart-connect          # Restart Kafka Connect service
 ```
 
 ## 📝 Configuration
@@ -828,47 +607,56 @@ make restart-*              # Restart specific services
 Key configurations in `.env`:
 
 ```bash
-# MongoDB
-MONGO_INITDB_ROOT_USERNAME=admin
-MONGO_INITDB_ROOT_PASSWORD=password123
-MONGO_REPLICA_SET_NAME=rs0
+# MongoDB Atlas Configuration (REQUIRED)
+MONGODB_ATLAS_CONNECTION_STRING=mongodb+srv://<username>:<password>@<cluster>.mongodb.net/<database>?retryWrites=true&w=majority
+MONGODB_DATABASE=exemplo
 
-# Kafka
-KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9092
+# External Kafka Configuration (REQUIRED)
+KAFKA_BOOTSTRAP_SERVERS=<kafka-broker-1>:9092,<kafka-broker-2>:9092
 
-# Ports
-KAFKA_UI_PORT=8080
-MONGO_EXPRESS_PORT=8081
+# Kafka Connect Configuration
+CONNECT_GROUP_ID=connect-cluster
+CONNECT_CONFIG_STORAGE_TOPIC=connect-configs
+CONNECT_OFFSET_STORAGE_TOPIC=connect-offsets
+CONNECT_STATUS_STORAGE_TOPIC=connect-status
+
+# Optional: Kafka Security Configuration
+KAFKA_SECURITY_PROTOCOL=PLAINTEXT
+KAFKA_SASL_MECHANISM=
+KAFKA_SASL_JAAS_CONFIG=
 ```
 
 ### Connector Configuration
 
 The MongoDB Source Connector is configured in `config/kafka-connect/mongodb-source-connector.json`:
 
-- **Change Streams**: Real-time change capture
-- **Multiple Collections**: All collections in database
+- **Change Streams**: Real-time change capture from Atlas
+- **Environment Variables**: Uses placeholders for Atlas connection string
+- **Multiple Collections**: All collections in specified database
 - **Error Handling**: Dead letter queue for failed messages
 - **JSON Format**: Simplified JSON output
 
 ## 🧪 Testing Real-time Sync
 
-1. **Insert data** into MongoDB:
+1. **Connect to MongoDB Atlas**:
    ```bash
-   make sample-data
+   # Use MongoDB Atlas web interface or connect locally
+   mongosh "${MONGODB_ATLAS_CONNECTION_STRING}"
    ```
 
-2. **Monitor Kafka topics**:
-   ```bash
-   make monitor-topics
+2. **Insert test data**:
+   ```javascript
+   use exemplo
+   db.users.insertOne({name: "Test User", email: "test@example.com"})
    ```
 
-3. **View in Kafka UI**:
-   - Open http://localhost:8080
-   - Check topics: `mongodb.exemplo.users`, `mongodb.exemplo.products`
+3. **Monitor connector status**:
+   ```bash
+   curl http://localhost:8083/connectors/mongodb-atlas-connector/status
+   ```
 
-4. **Make changes** in MongoDB Express:
-   - Open http://localhost:8081
-   - Update documents and see changes in Kafka
+4. **Check Kafka topics**:
+   Use your Kafka cluster's monitoring tools to verify messages are being produced to topics like `mongodb.exemplo.users`.
 
 ## 📚 Documentation
 
@@ -878,9 +666,34 @@ The MongoDB Source Connector is configured in `config/kafka-connect/mongodb-sour
 
 ## 🏭 Production Deployment
 
-### Azure Cloud Deployment (Automated) 🚀
+### Cloud-Native Setup 🚀
 
-This project includes a complete CI/CD pipeline for automated deployment to Azure:
+This Atlas-based configuration is designed for cloud deployment:
+
+**Advantages:**
+- ✅ **No Local Dependencies** - Only Kafka Connect needs to be deployed
+- ✅ **MongoDB Atlas Integration** - Fully managed database service
+- ✅ **External Kafka Support** - Works with any Kafka service (Confluent Cloud, AWS MSK, etc.)
+- ✅ **Minimal Infrastructure** - Single container deployment
+- ✅ **Environment-based Config** - All connections via environment variables
+
+### Deployment Options
+
+#### Option 1: Container Platforms
+Deploy to any container platform:
+```bash
+# Build production image
+docker build -t your-registry/kafka-connect-atlas .
+
+# Push to registry
+docker push your-registry/kafka-connect-atlas
+
+# Deploy with your platform (Kubernetes, Docker Swarm, etc.)
+# Set environment variables for Atlas and Kafka connections
+```
+
+#### Option 2: Azure Container Instances (Automated)
+This project includes Azure deployment automation:
 
 - ✅ **Automated Build and Push** to Azure Container Registry (ACR)
 - ✅ **Deploy to Azure Web App for Containers** or Azure Container Instances
