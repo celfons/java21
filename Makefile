@@ -78,6 +78,15 @@ test: ## Run mock tests for Atlas configuration
 	@echo "Running mock tests for Atlas configuration..."
 	@./test-atlas-setup.sh
 
+# Run enhanced integration tests with local infrastructure
+test-integration: ## Run enhanced integration tests with local infrastructure
+	@echo "Running enhanced integration tests..."
+	@./test-integration-enhanced.sh
+
+# Run all tests (mock + integration)
+test-all: test test-integration ## Run all tests (mock configuration + integration pipeline)
+	@echo "All tests completed successfully!"
+
 # Run Atlas health checks
 health-check: ## Run Atlas health checks
 	@echo "Running Atlas health checks..."
