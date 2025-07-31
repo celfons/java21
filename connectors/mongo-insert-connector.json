@@ -3,8 +3,8 @@
   "config": {
     "connector.class": "com.mongodb.kafka.connect.MongoSourceConnector",
     "tasks.max": "1",
-    "connection.uri": "mongodb://mongo1:27017,mongo2:27017,mongo3:27017/?replicaSet=rs0",
-    "database": "exemplo",
+    "connection.uri": "${MONGODB_ATLAS_CONNECTION_STRING}",
+    "database": "${MONGODB_DATABASE}",
     "collection": "",
     "topic.prefix": "mongo-insert",
     "topic.suffix": "",
@@ -26,7 +26,7 @@
     "errors.log.enable": "true",
     "errors.log.include.messages": "true",
     "errors.deadletterqueue.topic.name": "mongo-insert-dlq",
-    "errors.deadletterqueue.topic.replication.factor": "1",
+    "errors.deadletterqueue.topic.replication.factor": "3",
     "errors.deadletterqueue.context.headers.enable": "true",
     "transforms": "unwrap",
     "transforms.unwrap.type": "com.mongodb.kafka.connect.source.MongoDbTimestampConverter"

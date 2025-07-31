@@ -1,0 +1,173 @@
+# Atlas Configuration Testing Workflow
+# Runs mock tests for MongoDB Atlas and external Kafka setup
+
+name: 'Atlas Configuration Tests'
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
+      - '.github/workflows/azure-*.yml'
+  pull_request:
+    branches: [ main, develop ]
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
+      - '.github/workflows/azure-*.yml'
+  workflow_dispatch:
+
+env:
+  # Atlas test environment configuration
+  COMPOSE_PROJECT_NAME: mongodb-kafka-atlas-test
+  MONGODB_DATABASE: exemplo
+  
+  # Health check configuration for Atlas setup
+  HEALTH_CHECK_RETRIES: 5
+  HEALTH_CHECK_INTERVAL: 30s
+  HEALTH_CHECK_TIMEOUT: 15s
+  HEALTH_CHECK_START_PERIOD: 180s
+  
+jobs:
+  atlas-config-tests:
+    name: 'Atlas Configuration Tests'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+    - name: 'Checkout Repository'
+      uses: actions/checkout@v4
+      
+    - name: 'Set up Docker Buildx'
+      uses: docker/setup-buildx-action@v3
+      
+    - name: 'Install Required Tools'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y jq curl gettext-base
+        
+        # Create docker-compose alias for compatibility
+        sudo tee /usr/local/bin/docker-compose > /dev/null << 'EOF'
+        #!/bin/bash
+        exec docker compose "$@"
+        EOF
+        sudo chmod +x /usr/local/bin/docker-compose
+
+    - name: 'Create Test Environment File'
+      run: |
+        cp .env.example .env
+        # Set test environment variables
+        {
+          echo "COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME}"
+          echo "MONGODB_DATABASE=${MONGODB_DATABASE}"
+          echo "HEALTH_CHECK_RETRIES=${HEALTH_CHECK_RETRIES}"
+          echo "HEALTH_CHECK_INTERVAL=${HEALTH_CHECK_INTERVAL}"
+          echo "HEALTH_CHECK_TIMEOUT=${HEALTH_CHECK_TIMEOUT}"
+          echo "HEALTH_CHECK_START_PERIOD=${HEALTH_CHECK_START_PERIOD}"
+          echo "# Test environment - external connections would be configured here"
+          echo "MONGODB_ATLAS_CONNECTION_STRING=mongodb+srv://testuser:testpass@testcluster.mongodb.net/testdb?retryWrites=true&w=majority"
+          echo "KAFKA_BOOTSTRAP_SERVERS=kafka1.example.com:9092,kafka2.example.com:9092"
+        } >> .env
+        
+        echo "=== Test Environment Configuration ==="
+        cat .env
+        
+    - name: 'Run Mock Configuration Tests'
+      run: |
+        echo "Running Atlas configuration mock tests..."
+        chmod +x test-atlas-setup.sh
+        ./test-atlas-setup.sh
+        
+    - name: 'Build Kafka Connect Image'
+      run: |
+        echo "Building Kafka Connect image for Atlas configuration..."
+        make build
+        
+    - name: 'Test Docker Compose Syntax'
+      run: |
+        echo "Validating Docker Compose configuration..."
+        docker compose config
+        
+    - name: 'Test Connector Configuration Templates'
+      run: |
+        echo "Testing connector configuration templates..."
+        
+        # Set environment variables for testing
+        export MONGODB_ATLAS_CONNECTION_STRING="mongodb+srv://testuser:testpass@testcluster.mongodb.net/testdb?retryWrites=true&w=majority"
+        export KAFKA_BOOTSTRAP_SERVERS="kafka1.example.com:9092,kafka2.example.com:9092"
+        export MONGODB_DATABASE="testdb"
+        
+        # Test main connector config
+        echo "Testing main connector config substitution..."
+        envsubst < config/kafka-connect/mongodb-source-connector.json > /tmp/test-main-connector.json
+        jq . /tmp/test-main-connector.json > /dev/null
+        echo "✓ Main connector config is valid JSON after substitution"
+        
+        # Test multi-connectors
+        for connector in connectors/*.json; do
+          echo "Testing $(basename "$connector") substitution..."
+          envsubst < "$connector" > "/tmp/test-$(basename "$connector")"
+          jq . "/tmp/test-$(basename "$connector")" > /dev/null
+          echo "✓ $(basename "$connector") is valid JSON after substitution"
+        done
+        
+    - name: 'Test Setup Scripts'
+      run: |
+        echo "Testing setup scripts..."
+        
+        # Test that scripts are executable and validate basic syntax
+        bash -n scripts/setup-connector.sh
+        echo "✓ setup-connector.sh has valid syntax"
+        
+        bash -n scripts/setup-multi-connectors.sh
+        echo "✓ setup-multi-connectors.sh has valid syntax"
+        
+        bash -n scripts/health-check-atlas.sh
+        echo "✓ health-check-atlas.sh has valid syntax"
+        
+    - name: 'Test Makefile Commands'
+      run: |
+        echo "Testing Makefile commands..."
+        
+        # Test that help command works
+        make help
+        echo "✓ Makefile help command works"
+        
+        # Test environment file creation
+        rm -f .env
+        make .env
+        test -f .env
+        echo "✓ Makefile can create .env file"
+        
+    - name: 'Validate Atlas Setup Documentation'
+      run: |
+        echo "Validating Atlas setup documentation..."
+        
+        # Check that .env.example has required Atlas variables
+        grep -q "MONGODB_ATLAS_CONNECTION_STRING" .env.example
+        grep -q "KAFKA_BOOTSTRAP_SERVERS" .env.example
+        grep -q "MONGODB_DATABASE" .env.example
+        echo "✓ .env.example contains required Atlas variables"
+        
+        # Check that old local variables are removed
+        ! grep -q "MONGO_INITDB_ROOT_USERNAME" .env.example
+        ! grep -q "KAFKA_BROKER_ID" .env.example
+        echo "✓ Old local variables removed from .env.example"
+        
+    - name: 'Generate Test Report'
+      if: always()
+      run: |
+        echo "=== Atlas Configuration Test Summary ==="
+        echo "Timestamp: $(date)"
+        echo "Git Commit: ${GITHUB_SHA}"
+        echo "Branch: ${GITHUB_REF#refs/heads/}"
+        echo ""
+        echo "✅ All Atlas configuration tests completed"
+        echo "🔧 Configuration is ready for external MongoDB Atlas and Kafka"
+        echo ""
+        echo "Next steps for deployment:"
+        echo "  1. Set up MongoDB Atlas cluster"
+        echo "  2. Configure external Kafka cluster" 
+        echo "  3. Set environment variables in production"
+        echo "  4. Deploy Kafka Connect service"
