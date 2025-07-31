@@ -106,48 +106,84 @@ After setup, you can access:
 
 ## 🧪 Testing
 
-### Mock Configuration Tests
+This project includes **comprehensive testing** at multiple levels to ensure reliability and correctness of the MongoDB Kafka Connector setup.
 
-This project includes **mock tests** that validate the Atlas configuration without requiring actual MongoDB Atlas or Kafka clusters. These tests ensure all configurations are correct and ready for deployment.
+### Testing Levels
 
-#### 🔄 What Gets Tested
-
-The mock test suite validates:
-
-- ✅ **Docker Configuration**: Kafka Connect service configuration
-- ✅ **Connector Templates**: JSON syntax and environment variable placeholders
-- ✅ **Environment Setup**: Required variables and cleanup of legacy settings
-- ✅ **Script Validation**: Setup scripts syntax and functionality
-- ✅ **File Structure**: Removal of obsolete local setup files
-
-#### 🚀 Automated Test Execution
-
-Tests run automatically on:
-- **Push to main/develop branches**
-- **Pull requests**
-- **Manual workflow dispatch**
-
-View test results in the [GitHub Actions tab](../../actions/workflows/atlas-tests.yml).
-
-#### 🖥️ Running Tests Locally
+#### 1. Configuration Tests (Fast)
+Mock tests that validate Atlas configuration without requiring external services:
 
 ```bash
 # Run mock configuration tests
 make test
-
-# Run health checks (when Kafka Connect is running)
-make health-check
-
-# Check service status
-make status
 ```
 
-#### 🔧 What Tests Don't Require
+**What's tested:**
+- ✅ Docker Compose configuration validation
+- ✅ Connector JSON template syntax and structure
+- ✅ Environment variable substitution
+- ✅ Setup script validation
+- ✅ Health check configurations
 
-- ❌ No MongoDB Atlas cluster needed
-- ❌ No external Kafka cluster needed
-- ❌ No actual data synchronization
-- ✅ Pure configuration and template validation
+#### 2. Integration Pipeline Tests (Comprehensive)
+Full end-to-end testing with local infrastructure:
+
+```bash
+# Run integration tests with local MongoDB + Kafka
+make test-integration
+
+# Run all tests (configuration + integration)
+make test-all
+```
+
+**What's tested:**
+- ✅ Complete data pipeline (MongoDB → Kafka)
+- ✅ Connector deployment and health monitoring
+- ✅ Real-time data flow validation
+- ✅ Multi-connector setup with operation filtering
+- ✅ Environment variable configuration in live environment
+
+#### 3. Enhanced Integration Testing
+Advanced testing with debugging capabilities:
+
+```bash
+# Run with cleanup
+./test-integration-enhanced.sh
+
+# Keep infrastructure running for inspection
+./test-integration-enhanced.sh --no-cleanup
+
+# Show help
+./test-integration-enhanced.sh --help
+```
+
+### CI/CD Automated Testing
+
+The GitHub Actions workflow automatically runs on every push and pull request:
+
+- **Atlas Configuration Tests**: Quick validation (5-10 minutes)
+- **Integration Pipeline Tests**: Full testing with local infrastructure (20-30 minutes)
+- **Test Summary**: Final validation and build status determination
+
+View test results in the [GitHub Actions tab](../../actions/workflows/atlas-tests.yml).
+
+### Test Infrastructure
+
+Integration tests use local Docker containers to simulate production:
+
+- **MongoDB**: Replica set with authentication
+- **Kafka**: Single-node cluster with auto-topic creation  
+- **Kafka Connect**: Custom image with MongoDB connector plugin
+
+**No External Dependencies Required**:
+- ❌ No MongoDB Atlas cluster needed for testing
+- ❌ No external Kafka cluster needed for testing
+- ❌ No manual infrastructure setup
+- ✅ Pure automated local testing infrastructure
+
+### Debugging Failed Tests
+
+See the [Integration Testing Guide](docs/INTEGRATION_TESTING.md) for detailed troubleshooting information.
 
 ## 📊 Features
 
