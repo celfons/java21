@@ -1,105 +1,124 @@
-# MongoDB + Kafka + Kafka Connect - Complete Example
+# MongoDB Atlas + Kafka Connect - Cloud-Ready Example
 
-🚀 **Production-ready** MongoDB Kafka Connector example with real-time data synchronization using Docker.
+🚀 **Production-ready** MongoDB Atlas Kafka Connector setup with real-time data synchronization using external cloud services.
 
-![Architecture](https://img.shields.io/badge/Architecture-Microservices-blue)
-![MongoDB](https://img.shields.io/badge/MongoDB-7.0-green)
-![Kafka](https://img.shields.io/badge/Apache_Kafka-7.4.0-orange)
+![Architecture](https://img.shields.io/badge/Architecture-Cloud--Native-blue)
+![MongoDB Atlas](https://img.shields.io/badge/MongoDB-Atlas-green)
+![Kafka](https://img.shields.io/badge/Apache_Kafka-External-orange)
 ![Docker](https://img.shields.io/badge/Docker-Compose-blue)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
 
 ## 📋 Overview
 
-This project demonstrates a complete, production-ready setup for real-time data synchronization between MongoDB and Apache Kafka using the MongoDB Source Connector. Perfect for:
+This project demonstrates a **cloud-ready** setup for real-time data synchronization between **MongoDB Atlas** and external **Apache Kafka** clusters using the MongoDB Source Connector. Perfect for:
 
 - **Real-time analytics** and data streaming
 - **Event-driven architectures** and microservices
-- **Data pipeline** construction
-- **Change Data Capture (CDC)** implementations
+- **Data pipeline** construction with cloud services
+- **Change Data Capture (CDC)** implementations using Atlas change streams
 
 ## 🏗️ Architecture
 
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   MongoDB       │    │   Kafka         │    │   Consumers     │
-│   Replica Set   │───▶│   + Connect     │───▶│   Applications  │
-│   (3 nodes)     │    │                 │    │                 │
+│   MongoDB       │    │   Kafka         │    │   Consumer      │
+│   Atlas         │───▶│   Connect       │───▶│   Applications  │
+│   (Cloud)       │    │   (Docker)      │    │   (Your Apps)   │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
          │                       │                       │
-         │                       │                       │
      ┌───▼───┐              ┌────▼────┐              ┌───▼───┐
-     │ Mongo │              │ Kafka   │              │ Your  │
-     │Express│              │   UI    │              │ Apps  │
-     └───────┘              └─────────┘              └───────┘
+     │Change │              │External │              │ Data  │
+     │Streams│              │ Kafka   │              │Consumers│
+     └───────┘              │Cluster  │              └───────┘
+                            └─────────┘
 ```
 
+**Key Components:**
+- **MongoDB Atlas**: Managed MongoDB cluster with change streams
+- **Kafka Connect**: Dockerized connector service
+- **External Kafka**: Your existing Kafka cluster or managed service
+- **No Local Dependencies**: Pure cloud/external service integration
 ## 🚀 Quick Start
 
 ### Prerequisites
 
-- Docker 20.0+ and Docker Compose
-- 8GB+ RAM available
-- Ports 27017-27019, 2181, 8080-8083, 9092 available
+- **MongoDB Atlas Cluster**: Set up at [mongodb.com/atlas](https://mongodb.com/atlas)
+- **External Kafka Cluster**: Managed service or your own Kafka cluster
+- **Docker 20.0+** and Docker Compose
+- **Port 8083** available for Kafka Connect API
 
-### One-Command Setup
+### Environment Setup
 
+1. **Clone the repository**
 ```bash
-# Clone the repository
 git clone https://github.com/celfons/mongodb-kafka-connector-example.git
 cd mongodb-kafka-connector-example
+```
 
-# Complete setup with sample data
-make dev-setup
+2. **Create and configure environment**
+```bash
+# Create environment file
+make .env
 
-# Optional: Setup multiple filtered connectors for different operations
+# Edit .env file with your connection strings
+nano .env
+```
+
+3. **Required environment variables**
+```bash
+# MongoDB Atlas connection
+MONGODB_ATLAS_CONNECTION_STRING=mongodb+srv://<username>:<password>@<cluster>.mongodb.net/<database>?retryWrites=true&w=majority
+
+# External Kafka cluster
+KAFKA_BOOTSTRAP_SERVERS=<kafka-broker-1>:9092,<kafka-broker-2>:9092
+
+# Database to monitor
+MONGODB_DATABASE=exemplo
+```
+
+### Quick Setup
+
+```bash
+# Build and start Kafka Connect
+make setup
+
+# Setup single connector for all operations
+make setup-connector
+
+# OR setup multiple filtered connectors (INSERT, UPDATE, DELETE)
 make setup-multi-connectors
 ```
 
-**That's it!** 🎉 Your environment is ready with filtered connectors for INSERT, UPDATE, DELETE operations.
-
-### Manual Setup
-
-```bash
-# 1. Create environment file
-make .env
-
-# 2. Build and start services
-make setup
-
-# 3. Insert sample data (optional)
-make sample-data
-```
+**That's it!** 🎉 Your Kafka Connect is now streaming changes from MongoDB Atlas to your Kafka cluster.
 
 ## 🌐 Access Points
 
-After setup, access these services:
+After setup, you can access:
 
 | Service | URL | Description |
 |---------|-----|-------------|
-| **Kafka UI** | http://localhost:8080 | Monitor Kafka topics and messages |
-| **MongoDB Express** | http://localhost:8081 | MongoDB administration interface |
 | **Kafka Connect API** | http://localhost:8083 | Connector management REST API |
 
-**Default credentials:**
-- MongoDB Express: `admin` / `admin`
-- MongoDB: `admin` / `password123`
+**Useful API endpoints:**
+- `GET /connectors` - List all connectors
+- `GET /connectors/{name}/status` - Check connector status
+- `GET /connector-plugins` - List available plugins
 
-## 🧪 Automated Testing
+## 🧪 Testing
 
-### CI/CD Integration Tests
+### Mock Configuration Tests
 
-This project includes comprehensive **automated integration tests** that run on every build using GitHub Actions. The tests ensure all components work together correctly in a containerized environment.
+This project includes **mock tests** that validate the Atlas configuration without requiring actual MongoDB Atlas or Kafka clusters. These tests ensure all configurations are correct and ready for deployment.
 
 #### 🔄 What Gets Tested
 
-The automated test suite validates:
+The mock test suite validates:
 
-- ✅ **Service Health**: All Docker containers start and respond correctly
-- ✅ **MongoDB Replica Set**: Proper initialization and cluster communication  
-- ✅ **Kafka Ecosystem**: Broker, Zookeeper, and Connect API functionality
-- ✅ **Connector Setup**: MongoDB Source Connector configuration and status
-- ✅ **Data Flow**: End-to-end data insertion and message streaming
-- ✅ **Configuration Validation**: Docker Compose, JSON configs, and scripts
+- ✅ **Docker Configuration**: Kafka Connect service configuration
+- ✅ **Connector Templates**: JSON syntax and environment variable placeholders
+- ✅ **Environment Setup**: Required variables and cleanup of legacy settings
+- ✅ **Script Validation**: Setup scripts syntax and functionality
+- ✅ **File Structure**: Removal of obsolete local setup files
 
 #### 🚀 Automated Test Execution
 
@@ -108,26 +127,27 @@ Tests run automatically on:
 - **Pull requests**
 - **Manual workflow dispatch**
 
-View test results in the [GitHub Actions tab](../../actions/workflows/automated-tests.yml).
+View test results in the [GitHub Actions tab](../../actions/workflows/atlas-tests.yml).
 
 #### 🖥️ Running Tests Locally
 
-##### Option 1: Quick Test (Recommended)
 ```bash
-# Run the full test suite locally
+# Run mock configuration tests
 make test
+
+# Run health checks (when Kafka Connect is running)
+make health-check
+
+# Check service status
+make status
 ```
 
-##### Option 2: Complete Integration Test
-```bash
-# 1. Clean environment
-make down
+#### 🔧 What Tests Don't Require
 
-# 2. Run full validation
-./validate.sh
-
-# 3. Complete setup with testing
-make setup
+- ❌ No MongoDB Atlas cluster needed
+- ❌ No external Kafka cluster needed
+- ❌ No actual data synchronization
+- ✅ Pure configuration and template validation
 
 # 4. Run health checks
 ./scripts/health-check.sh
