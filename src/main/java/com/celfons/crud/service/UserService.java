@@ -18,7 +18,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
 import java.util.stream.Collectors;
 
 /**
@@ -32,11 +31,9 @@ public class UserService {
     private static final Logger logger = LoggerFactory.getLogger(UserService.class);
 
     private final UserRepository userRepository;
-    private final Executor virtualThreadExecutor;
 
-    public UserService(UserRepository userRepository, Executor virtualThreadExecutor) {
+    public UserService(UserRepository userRepository) {
         this.userRepository = userRepository;
-        this.virtualThreadExecutor = virtualThreadExecutor;
     }
 
     /**
@@ -138,7 +135,7 @@ public class UserService {
     /**
      * Search users by name or email - demonstrates async processing with virtual threads.
      */
-    @Async("virtualThreadExecutor")
+    @Async
     public CompletableFuture<List<UserResponseDTO>> searchUsersAsync(String searchTerm) {
         logger.debug("Async search for users with term: {}", searchTerm);
         
@@ -156,26 +153,26 @@ public class UserService {
             return users.stream()
                     .map(this::mapToResponseDTO)
                     .collect(Collectors.toList());
-        }, virtualThreadExecutor);
+        });
     }
 
     /**
      * Get active users count - demonstrates virtual threads.
      */
-    @Async("virtualThreadExecutor")
+    @Async
     public CompletableFuture<Long> getActiveUsersCountAsync() {
         logger.debug("Getting active users count asynchronously");
         
         return CompletableFuture.supplyAsync(() -> {
             logger.debug("Counting active users on virtual thread: {}", Thread.currentThread().getName());
             return userRepository.countActiveUsers();
-        }, virtualThreadExecutor);
+        });
     }
 
     /**
      * Bulk operations example with virtual threads.
      */
-    @Async("virtualThreadExecutor")
+    @Async
     public CompletableFuture<List<UserResponseDTO>> createUsersInBulk(List<UserCreateDTO> createDTOs) {
         logger.debug("Creating {} users in bulk", createDTOs.size());
         
@@ -193,7 +190,7 @@ public class UserService {
                     })
                     .filter(dto -> dto != null)
                     .collect(Collectors.toList());
-        }, virtualThreadExecutor);
+        });
     }
 
     // Helper method to map entity to DTO

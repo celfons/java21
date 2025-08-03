@@ -6,7 +6,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
 import java.time.Duration;
 import java.time.LocalDateTime;
 
@@ -17,12 +16,6 @@ import java.time.LocalDateTime;
 @RestController
 @RequestMapping("/api/virtual-threads")
 public class VirtualThreadsDemoController {
-
-    private final Executor virtualThreadExecutor;
-
-    public VirtualThreadsDemoController(Executor virtualThreadExecutor) {
-        this.virtualThreadExecutor = virtualThreadExecutor;
-    }
 
     /**
      * Basic virtual thread information.
@@ -65,7 +58,7 @@ public class VirtualThreadsDemoController {
                     ),
                     "timestamp", end
             );
-        }, virtualThreadExecutor);
+        });
     }
 
     /**
@@ -96,7 +89,7 @@ public class VirtualThreadsDemoController {
                     ),
                     "timestamp", end
             );
-        }, virtualThreadExecutor);
+        });
     }
 
     /**
@@ -115,7 +108,7 @@ public class VirtualThreadsDemoController {
                 Thread.currentThread().interrupt();
                 return "Task 1 interrupted";
             }
-        }, virtualThreadExecutor);
+        });
         
         CompletableFuture<String> task2 = CompletableFuture.supplyAsync(() -> {
             try {
@@ -125,7 +118,7 @@ public class VirtualThreadsDemoController {
                 Thread.currentThread().interrupt();
                 return "Task 2 interrupted";
             }
-        }, virtualThreadExecutor);
+        });
         
         CompletableFuture<String> task3 = CompletableFuture.supplyAsync(() -> {
             try {
@@ -135,7 +128,7 @@ public class VirtualThreadsDemoController {
                 Thread.currentThread().interrupt();
                 return "Task 3 interrupted";
             }
-        }, virtualThreadExecutor);
+        });
         
         // Combine all tasks
         return CompletableFuture.allOf(task1, task2, task3)
@@ -156,6 +149,6 @@ public class VirtualThreadsDemoController {
                             ),
                             "timestamp", end
                     );
-                }, virtualThreadExecutor);
+                });
     }
 }

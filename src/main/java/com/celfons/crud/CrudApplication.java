@@ -2,6 +2,7 @@ package com.celfons.crud;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.scheduling.annotation.EnableAsync;
 
 /**
  * Main Spring Boot application class for the CRUD API.
@@ -13,6 +14,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
  * - GraalVM native compilation support
  */
 @SpringBootApplication
+@EnableAsync
 public class CrudApplication {
 
     public static void main(String[] args) {

@@ -136,41 +136,71 @@ curl -X DELETE http://localhost:8080/api/users/1
 - 📖 **Documentation**: Comprehensive API documentation
 - 🏗️ **Architecture**: Clean layered architecture (Controller → Service → Repository)
 
-## 🎯 Virtual Threads Demonstration
+## 🎯 Virtual Threads Configuration
 
-This application showcases Java 21 virtual threads in several ways:
+This application uses **Spring Boot 3.4.5's built-in virtual threads support** for high-performance concurrent processing.
 
-### 1. Virtual Thread Configuration
+### Modern Spring Boot Approach (Current Implementation)
+
+Virtual threads are enabled through Spring Boot properties in `application.yml`:
+
+```yaml
+spring:
+  threads:
+    virtual:
+      enabled: true
+```
+
+This configuration automatically enables virtual threads for:
+- **Web Server Threads** - All HTTP requests are handled by virtual threads
+- **Async Operations** - Spring's `@Async` methods use virtual threads when available
+- **Reactive Streams** - Virtual threads are used for reactive processing
+
+### Benefits of Property-Based Configuration
+
+✅ **Simplified Setup** - No manual bean configuration required  
+✅ **Spring Boot Integration** - Automatic thread pool management  
+✅ **Consistent Behavior** - Follows Spring Boot's conventions  
+✅ **Future-Proof** - Automatically benefits from Spring Boot improvements  
+✅ **Production Ready** - Optimized defaults for enterprise applications
+
+### Virtual Threads in Action
+
+The application demonstrates virtual threads in several ways:
+
+#### 1. Web Request Handling
+All HTTP requests automatically use virtual threads:
+```bash
+curl http://localhost:8080/api/users/health
+# Response shows: "isVirtual": true
+```
+
+#### 2. Async Processing
+Service methods with `@Async` annotation use virtual threads:
 ```java
-@Bean(name = "virtualThreadExecutor")
-public Executor virtualThreadExecutor() {
-    return Executors.newVirtualThreadPerTaskExecutor();
+@Service
+public class UserService {
+    @Async
+    public CompletableFuture<List<UserResponseDTO>> searchUsersAsync(String term) {
+        // Automatically runs on virtual thread when available
+        return CompletableFuture.supplyAsync(() -> {
+            // Processing logic
+        });
+    }
 }
 ```
 
-### 2. Async Processing
-```java
-@Async("virtualThreadExecutor")
-public CompletableFuture<List<UserResponseDTO>> searchUsersAsync(String searchTerm) {
-    return CompletableFuture.supplyAsync(() -> {
-        // Processing on virtual thread
-        return userRepository.findByNameOrEmailContaining(searchTerm)
-                .stream()
-                .map(this::mapToResponseDTO)
-                .collect(Collectors.toList());
-    }, virtualThreadExecutor);
-}
-```
+#### 3. Virtual Thread Monitoring
+Check virtual thread usage via endpoints:
+```bash
+# Basic thread information  
+curl http://localhost:8080/api/virtual-threads/info
 
-### 3. Virtual Thread Monitoring
-The `/api/users/stats` endpoint shows thread information:
-```json
+# Response shows thread details:
 {
-  "activeUsers": 5,
-  "threadInfo": {
-    "currentThread": "VirtualThread[#21]/runnable@ForkJoinPool-1-worker-1",
-    "isVirtual": true
-  }
+  "threadName": "tomcat-handler-0",
+  "isVirtual": true,
+  "threadClass": "VirtualThread"
 }
 ```
 
@@ -336,11 +366,9 @@ src/
 ├── main/
 │   ├── java/com/celfons/crud/
 │   │   ├── CrudApplication.java
-│   │   ├── config/
-│   │   │   ├── VirtualThreadsConfig.java
-│   │   │   └── GraalVMConfig.java
 │   │   ├── controller/
-│   │   │   └── UserController.java
+│   │   │   ├── UserController.java
+│   │   │   └── VirtualThreadsDemoController.java
 │   │   ├── service/
 │   │   │   └── UserService.java
 │   │   ├── repository/
@@ -385,9 +413,10 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ### Common Issues
 
 #### Virtual Threads Not Working
-- Ensure Java 21+ is being used
-- Check `Thread.currentThread().isVirtual()` in logs
-- Verify virtual thread executor configuration
+- Ensure Java 21+ is being used: `java -version`
+- Check application.yml for `spring.threads.virtual.enabled: true`
+- Verify Spring Boot 3.4+ is being used
+- Monitor thread names in API responses for "VirtualThread" class
 
 #### Native Build Fails
 - Install GraalVM with native-image tool
@@ -401,8 +430,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ### Getting Help
 - Check application logs for detailed error messages
-- Use H2 console to inspect database state
-- Monitor virtual thread usage via `/api/users/stats`
+- Use H2 console to inspect database state  
+- Monitor virtual thread usage via `/api/virtual-threads/info`
+- Verify configuration with `/api/users/health` endpoint
 
 ---
 
