@@ -1,12 +1,12 @@
 server:
   port: 8080
-  thread:
-    virtual:
-      enabled: true
 
 spring:
   application:
     name: crud-app
+  threads:
+    virtual:
+      enabled: true
   
   # H2 Database Configuration
   datasource:
