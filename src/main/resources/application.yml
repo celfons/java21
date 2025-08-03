@@ -1,0 +1,53 @@
+server:
+  port: 8080
+  thread:
+    virtual:
+      enabled: true
+
+spring:
+  application:
+    name: crud-app
+  
+  # H2 Database Configuration
+  datasource:
+    url: jdbc:h2:mem:testdb
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: password
+  
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+  
+  # JPA Configuration
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+  
+  # Initialize schema with data
+  sql:
+    init:
+      mode: never
+
+# Management and Actuator
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,threaddump
+  endpoint:
+    health:
+      show-details: always
+
+# Logging
+logging:
+  level:
+    com.celfons.crud: DEBUG
+    org.springframework.web: DEBUG
+    org.hibernate.SQL: DEBUG
