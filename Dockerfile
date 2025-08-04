@@ -1,43 +1,62 @@
-FROM confluentinc/cp-kafka-connect:7.4.0
+# Multi-stage Dockerfile for GraalVM Native Build with Alpine Linux and musl
 
-# Metadados da imagem para produção
-LABEL maintainer="MongoDB Kafka Connector Team"
-LABEL version="1.0.0"
-LABEL description="MongoDB Kafka Connector for Azure deployment"
+# Stage 1: Build stage with GraalVM and Maven
+FROM ghcr.io/graalvm/graalvm-community:21-muslib AS builder
 
-# Variáveis de ambiente para produção
-ENV CONNECT_PLUGIN_PATH="/usr/share/java,/usr/share/confluent-hub-components"
-ENV CONNECT_REST_PORT=8083
-ENV CONNECT_LOG4J_ROOT_LOGLEVEL=INFO
+# Install required packages for native build
+RUN microdnf install -y findutils
 
-# Switch to root for installations
-USER root
+# Set working directory
+WORKDIR /app
 
-# Install MongoDB Kafka Connector with fallback
-RUN echo "Installing MongoDB Kafka Connector..." && \
-    (confluent-hub install --no-prompt mongodb/kafka-connect-mongodb:1.11.1 || \
-     echo "Warning: Failed to install MongoDB connector - will continue without it")
+# Copy Maven files
+COPY pom.xml .
+COPY .mvn .mvn
+COPY mvnw .
 
-# Create directories for logs only (avoid conflicts with default config)
-RUN mkdir -p /var/log/kafka-connect /usr/share/confluent-hub-components
+# Make Maven wrapper executable
+RUN chmod +x mvnw
 
-# Copy startup and health check scripts
-COPY scripts/enhanced-startup.sh /usr/local/bin/enhanced-startup.sh
-COPY scripts/enhanced-health-check.sh /usr/local/bin/enhanced-health-check.sh
+# Download dependencies (for better caching)
+RUN ./mvnw dependency:go-offline -B
 
-# Set proper permissions for appuser
-RUN chmod +x /usr/local/bin/enhanced-startup.sh /usr/local/bin/enhanced-health-check.sh
-RUN chown -R appuser:appuser /var/log/kafka-connect /usr/local/bin/enhanced-startup.sh /usr/local/bin/enhanced-health-check.sh
+# Copy source code
+COPY src ./src
 
-# Health check configurado para Azure
-HEALTHCHECK --interval=30s --timeout=15s --start-period=180s --retries=10 \
-    CMD /usr/local/bin/enhanced-health-check.sh
+# Build native executable with musl static linking
+RUN ./mvnw clean -Pnative native:compile -DskipTests
 
-# Expose Kafka Connect REST API port
-EXPOSE 8083
+# Stage 2: Runtime stage with Alpine Linux
+FROM alpine:3.19
 
-# Switch back to appuser for security
+# Install required runtime dependencies
+RUN apk add --no-cache \
+    libc6-compat \
+    && addgroup -g 1001 -S appgroup \
+    && adduser -u 1001 -S appuser -G appgroup
+
+# Set working directory
+WORKDIR /app
+
+# Copy the native executable from builder stage
+COPY --from=builder /app/target/product-crud /app/product-crud
+
+# Change ownership to non-root user
+RUN chown appuser:appgroup /app/product-crud && \
+    chmod +x /app/product-crud
+
+# Switch to non-root user
 USER appuser
 
-# Use default startup script but with our enhanced script as an init process
-CMD ["/etc/confluent/docker/run"]
+# Expose port
+EXPOSE 8080
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=30s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/actuator/health || exit 1
+
+# Set memory limits for native image
+ENV JAVA_OPTS="-XX:MaxRAMPercentage=80.0"
+
+# Run the native executable
+ENTRYPOINT ["./product-crud"]
