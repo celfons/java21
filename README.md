@@ -97,13 +97,20 @@ cd mongodb-kafka-connector-example
 #### Build and Run with Docker
 
 ```bash
-# Build Docker image with native compilation
+# Build native Docker image (requires more time and resources)
 docker build -t product-crud-native .
 
-# Run container
+# OR build JVM Docker image (faster, for development)
+# First build the JAR locally:
+./mvnw clean package -DskipTests
+
+# Then build the simple Docker image:
+docker build -f Dockerfile.simple -t product-crud-jvm .
+
+# Run container with environment variables
 docker run -p 8080:8080 \
   -e SPRING_DATA_MONGODB_URI="mongodb+srv://USERNAME:PASSWORD@CLUSTER.mongodb.net/productdb?retryWrites=true&w=majority" \
-  product-crud-native
+  product-crud-jvm
 ```
 
 #### Using Docker Compose (Optional)
@@ -231,10 +238,19 @@ The application is configured to use Java 21 virtual threads through:
 
 ### Performance Characteristics
 
-- **Startup Time**: ~50ms (native) vs ~2s (JVM)
-- **Memory Usage**: ~20MB (native) vs ~200MB (JVM)  
+#### JVM Deployment
+- **Startup Time**: ~3-5s 
+- **Memory Usage**: ~200-300MB  
+- **Throughput**: 10,000+ concurrent requests with virtual threads
+- **Image Size**: ~270MB (Alpine + JRE + JAR)
+
+#### Native Deployment (GraalVM)
+- **Startup Time**: ~50ms (native binary)
+- **Memory Usage**: ~20-50MB (native binary)  
 - **Throughput**: 10,000+ concurrent requests with virtual threads
 - **Image Size**: ~50MB (Alpine + native binary)
+
+**Note**: Native compilation provides faster startup and lower memory usage but requires longer build times.
 
 ### Monitoring
 
