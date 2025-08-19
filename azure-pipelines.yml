@@ -1,0 +1,183 @@
+# Azure DevOps Pipeline for Java 21 Virtual Threads Application
+# Builds, tests, generates coverage, builds Docker image, and runs smoke tests
+
+trigger:
+  branches:
+    include:
+      - main
+      - develop
+      - feature/*
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  # These variables should be configured in Azure DevOps as pipeline variables
+  dockerRegistryServiceConnection: 'your-docker-registry-connection'
+  ACR_NAME: 'your-acr-name'
+  azureServiceConnection: 'your-azure-service-connection'
+  AZURE_WEBAPP_NAME: 'your-webapp-name'
+  imageName: 'product-crud-java21'
+  imageTag: '$(Build.BuildId)'
+
+stages:
+- stage: BuildAndTest
+  displayName: 'Build and Test'
+  jobs:
+  - job: BuildTestCoverage
+    displayName: 'Build, Test and Generate Coverage'
+    steps:
+    - task: JavaToolInstaller@0
+      displayName: 'Install Java 21'
+      inputs:
+        versionSpec: '21'
+        jdkArchitectureOption: 'x64'
+        jdkSourceOption: 'PreInstalled'
+
+    - task: Cache@2
+      displayName: 'Cache Maven dependencies'
+      inputs:
+        key: 'maven | "$(Agent.OS)" | **/pom.xml'
+        restoreKeys: |
+          maven | "$(Agent.OS)"
+          maven
+        path: '$(Pipeline.Workspace)/.m2/repository'
+
+    - script: |
+        export MAVEN_OPTS="-Dmaven.repo.local=$(Pipeline.Workspace)/.m2/repository"
+        ./mvnw --version
+        java -version
+      displayName: 'Display Java and Maven versions'
+
+    - script: |
+        export MAVEN_OPTS="-Dmaven.repo.local=$(Pipeline.Workspace)/.m2/repository"
+        ./mvnw -B clean verify
+      displayName: 'Maven build and test with coverage'
+
+    - task: PublishTestResults@2
+      displayName: 'Publish Test Results'
+      inputs:
+        testResultsFormat: 'JUnit'
+        testResultsFiles: '**/target/surefire-reports/TEST-*.xml'
+        testRunTitle: 'Java 21 Unit and Integration Tests'
+      condition: succeededOrFailed()
+
+    - task: PublishCodeCoverageResults@1
+      displayName: 'Publish Code Coverage'
+      inputs:
+        codeCoverageTool: 'JaCoCo'
+        summaryFileLocation: '**/target/site/jacoco/jacoco.xml'
+        reportDirectory: '**/target/site/jacoco'
+        failIfCoverageEmpty: false
+
+    - task: PublishBuildArtifacts@1
+      displayName: 'Publish JAR Artifact'
+      inputs:
+        pathToPublish: 'target/*.jar'
+        artifactName: 'java-app'
+
+- stage: DockerBuildAndPush
+  displayName: 'Docker Build and Push'
+  dependsOn: BuildAndTest
+  condition: succeeded()
+  jobs:
+  - job: DockerBuild
+    displayName: 'Build and Push Docker Image'
+    steps:
+    - task: Docker@2
+      displayName: 'Build Docker Image'
+      inputs:
+        containerRegistry: '$(dockerRegistryServiceConnection)'
+        repository: '$(imageName)'
+        command: 'build'
+        Dockerfile: '**/Dockerfile'
+        tags: |
+          $(imageTag)
+          latest
+
+    - task: Docker@2
+      displayName: 'Push Docker Image'
+      inputs:
+        containerRegistry: '$(dockerRegistryServiceConnection)'
+        repository: '$(imageName)'
+        command: 'push'
+        tags: |
+          $(imageTag)
+          latest
+
+- stage: SmokeTest
+  displayName: 'Container Smoke Test'
+  dependsOn: DockerBuildAndPush
+  condition: succeeded()
+  jobs:
+  - job: SmokeTest
+    displayName: 'Run Container Smoke Tests'
+    steps:
+    - script: |
+        echo "Starting container smoke test..."
+        
+        # Pull and run the Docker image
+        docker run -d --name test-container -p 8080:8080 \
+          -e SPRING_DATA_MONGODB_URI="mongodb://dummy:27017/testdb" \
+          $(ACR_NAME).azurecr.io/$(imageName):$(imageTag)
+        
+        # Wait for application to start
+        echo "Waiting for application to start..."
+        sleep 30
+        
+        # Run health check
+        echo "Running health check..."
+        for i in {1..10}; do
+          if curl -f http://localhost:8080/actuator/health; then
+            echo "Health check passed!"
+            break
+          else
+            echo "Health check attempt $i failed, retrying in 10 seconds..."
+            sleep 10
+          fi
+          
+          if [ $i -eq 10 ]; then
+            echo "Health check failed after 10 attempts"
+            docker logs test-container
+            exit 1
+          fi
+        done
+        
+        # Additional smoke tests
+        echo "Running additional endpoint tests..."
+        
+        # Test info endpoint
+        curl -f http://localhost:8080/actuator/info || echo "Info endpoint not available (expected)"
+        
+        # Test metrics endpoint
+        curl -f http://localhost:8080/actuator/metrics || echo "Metrics endpoint test completed"
+        
+        echo "Smoke tests completed successfully!"
+        
+      displayName: 'Run Health Check and Smoke Tests'
+
+    - script: |
+        # Cleanup
+        docker stop test-container || true
+        docker rm test-container || true
+      displayName: 'Cleanup Test Container'
+      condition: always()
+
+- stage: Deploy
+  displayName: 'Deploy to Azure'
+  dependsOn: SmokeTest
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+  jobs:
+  - deployment: DeployToAzure
+    displayName: 'Deploy to Azure Web App'
+    environment: 'production'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - task: AzureWebAppContainer@1
+            displayName: 'Deploy to Azure Web App'
+            inputs:
+              azureSubscription: '$(azureServiceConnection)'
+              appName: '$(AZURE_WEBAPP_NAME)'
+              containers: '$(ACR_NAME).azurecr.io/$(imageName):$(imageTag)'
