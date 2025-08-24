@@ -1,4 +1,4 @@
-package com.celfons.productcrud.config;
+package dev.rinha.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

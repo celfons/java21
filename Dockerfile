@@ -39,11 +39,11 @@ RUN apk add --no-cache \
 WORKDIR /app
 
 # Copy the native executable from builder stage
-COPY --from=builder /app/target/product-crud /app/product-crud
+COPY --from=builder /app/target/rinha /app/rinha
 
 # Change ownership to non-root user
-RUN chown appuser:appgroup /app/product-crud && \
-    chmod +x /app/product-crud
+RUN chown appuser:appgroup /app/rinha && \
+    chmod +x /app/rinha
 
 # Switch to non-root user
 USER appuser
@@ -59,4 +59,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=30s --retries=3 \
 ENV JAVA_OPTS="-XX:MaxRAMPercentage=80.0"
 
 # Run the native executable
-ENTRYPOINT ["./product-crud"]
+ENTRYPOINT ["./rinha"]

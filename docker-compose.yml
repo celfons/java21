@@ -1,0 +1,131 @@
+version: '3.8'
+
+services:
+  # Redis for storage and idempotency
+  redis:
+    image: redis:7-alpine
+    container_name: rinha-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    deploy:
+      resources:
+        limits:
+          memory: 300M
+          cpus: '0.5'
+    networks:
+      - rinha-network
+
+  # HAProxy load balancer
+  haproxy:
+    image: haproxy:2.9-alpine
+    container_name: rinha-haproxy
+    ports:
+      - "8080:8080"
+      - "8081:8081"  # Default processor endpoint
+      - "8082:8082"  # Fallback processor endpoint
+      - "8404:8404"  # HAProxy stats
+    volumes:
+      - ./haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    depends_on:
+      - rinha-app-1
+      - rinha-app-2
+    deploy:
+      resources:
+        limits:
+          memory: 50M
+          cpus: '0.2'
+    networks:
+      - rinha-network
+
+  # Application instance 1
+  rinha-app-1:
+    image: rinha-native:latest
+    container_name: rinha-app-1
+    ports:
+      - "8090:8080"
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - PROCESSOR_DEFAULT_URL=http://haproxy:8081
+      - PROCESSOR_FALLBACK_URL=http://haproxy:8082
+      - JAVA_OPTS=-XX:MaxRAMPercentage=80.0
+    depends_on:
+      - redis
+    deploy:
+      resources:
+        limits:
+          memory: 200M
+          cpus: '0.5'
+    networks:
+      - rinha-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 30s
+
+  # Application instance 2
+  rinha-app-2:
+    image: rinha-native:latest
+    container_name: rinha-app-2
+    ports:
+      - "8091:8080"
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - PROCESSOR_DEFAULT_URL=http://haproxy:8081
+      - PROCESSOR_FALLBACK_URL=http://haproxy:8082
+      - JAVA_OPTS=-XX:MaxRAMPercentage=80.0
+    depends_on:
+      - redis
+    deploy:
+      resources:
+        limits:
+          memory: 200M
+          cpus: '0.5'
+    networks:
+      - rinha-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 30s
+
+  # Mock default processor
+  mock-processor-default:
+    image: nginx:alpine
+    container_name: mock-processor-default
+    ports:
+      - "8083:80"
+    volumes:
+      - ./mock-processor.conf:/etc/nginx/conf.d/default.conf:ro
+    deploy:
+      resources:
+        limits:
+          memory: 30M
+          cpus: '0.1'
+    networks:
+      - rinha-network
+
+  # Mock fallback processor
+  mock-processor-fallback:
+    image: nginx:alpine
+    container_name: mock-processor-fallback
+    ports:
+      - "8084:80"
+    volumes:
+      - ./mock-processor.conf:/etc/nginx/conf.d/default.conf:ro
+    deploy:
+      resources:
+        limits:
+          memory: 30M
+          cpus: '0.1'
+    networks:
+      - rinha-network
+
+networks:
+  rinha-network:
+    driver: bridge
