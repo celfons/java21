@@ -14,7 +14,7 @@ echo ""
 
 # Test POST /payments
 echo "💰 Testing POST /payments..."
-CORRELATION_ID=$(uuidgen 2>/dev/null || python3 -c "import uuid; print(uuid.uuid4())" 2>/dev/null || echo "$(date +%s)-test")
+CORRELATION_ID=$(python3 -c "import uuid; print(uuid.uuid4())" 2>/dev/null || echo "$(date +%s)-$(($RANDOM % 1000))")
 RESPONSE=$(curl -s -w "%{http_code}" -X POST "$BASE_URL/payments" \
     -H "Content-Type: application/json" \
     -d "{\"correlationId\":\"$CORRELATION_ID\",\"amount\":123.45}")
