@@ -11,11 +11,11 @@
         <relativePath/>
     </parent>
     
-    <groupId>com.celfons</groupId>
-    <artifactId>product-crud</artifactId>
+    <groupId>dev.rinha</groupId>
+    <artifactId>rinha</artifactId>
     <version>1.0.0</version>
-    <name>ProductCrudApplication</name>
-    <description>Modern CRUD API with Java 21 Virtual Threads and MongoDB Atlas</description>
+    <name>RinhaBackend2025</name>
+    <description>Rinha de Backend 2025 - High-performance payment processing API</description>
     
     <properties>
         <java.version>21</java.version>
@@ -32,11 +32,6 @@
         
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-data-mongodb</artifactId>
-        </dependency>
-        
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-validation</artifactId>
         </dependency>
         
@@ -45,15 +40,29 @@
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
         
+        <!-- Redis for storage and idempotency -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
+        </dependency>
+        
         <!-- Test Dependencies -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
+        
+        <dependency>
+            <groupId>it.ozimov</groupId>
+            <artifactId>embedded-redis</artifactId>
+            <version>0.7.3</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
     
     <build>
+        <finalName>rinha</finalName>
         <plugins>
             <plugin>
                 <groupId>org.springframework.boot</groupId>

@@ -1,4 +1,4 @@
-package com.celfons.productcrud.integration;
+package dev.rinha.integration;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,8 +17,10 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @TestPropertySource(properties = {
-    "spring.data.mongodb.uri=mongodb://localhost:27017/testdb",
-    "management.health.mongo.enabled=false"  // Disable MongoDB health check for integration tests
+    "spring.data.redis.host=localhost",
+    "spring.data.redis.port=6370",  // Use different port to avoid conflicts
+    "processor.default.url=http://localhost:8081",
+    "processor.fallback.url=http://localhost:8082"
 })
 class HealthIntegrationTest {
 
