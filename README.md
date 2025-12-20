@@ -483,6 +483,93 @@ The application includes Spring Boot Actuator endpoints:
 - `/actuator/health` - Health check
 - `/actuator/info` - Application info
 - `/actuator/metrics` - Application metrics
+- `/actuator/kafka-listeners` - Kafka listener management
+
+#### Kafka Listener Management
+
+The application provides custom Actuator endpoints for managing Kafka listeners at runtime:
+
+##### List all Kafka listeners
+
+```bash
+curl http://localhost:8080/actuator/kafka-listeners
+```
+
+**Response:**
+```json
+{
+  "listeners": [
+    {
+      "id": "my-listener-id",
+      "running": true,
+      "containerClass": "ConcurrentMessageListenerContainer"
+    }
+  ],
+  "totalCount": 1,
+  "runningCount": 1,
+  "stoppedCount": 0
+}
+```
+
+##### Disable all Kafka listeners
+
+Stops all registered Kafka listener containers:
+
+```bash
+curl -X POST http://localhost:8080/actuator/kafka-listeners/disable
+```
+
+**Response:**
+```json
+{
+  "listeners": [
+    {
+      "id": "my-listener-id",
+      "running": false,
+      "containerClass": "ConcurrentMessageListenerContainer"
+    }
+  ],
+  "totalCount": 1,
+  "runningCount": 0,
+  "stoppedCount": 1,
+  "action": "disable",
+  "disabledListeners": ["my-listener-id"],
+  "message": "All listener containers have been stopped"
+}
+```
+
+##### Enable all Kafka listeners
+
+Starts all registered Kafka listener containers:
+
+```bash
+curl -X POST http://localhost:8080/actuator/kafka-listeners/enable
+```
+
+**Response:**
+```json
+{
+  "listeners": [
+    {
+      "id": "my-listener-id",
+      "running": true,
+      "containerClass": "ConcurrentMessageListenerContainer"
+    }
+  ],
+  "totalCount": 1,
+  "runningCount": 1,
+  "stoppedCount": 0,
+  "action": "enable",
+  "enabledListeners": ["my-listener-id"],
+  "message": "All listener containers have been started"
+}
+```
+
+**Use Cases:**
+- Temporarily pause message consumption during maintenance windows
+- Stop listeners before deploying configuration changes
+- Debug message processing issues by controlling listener state
+- Graceful application shutdown by stopping listeners first
 
 ### Environment Variables
 
