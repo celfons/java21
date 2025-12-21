@@ -82,6 +82,101 @@ graph LR
 - **SOLID Principles**: Interface segregation, dependency inversion, single responsibility
 - **Native Compilation**: GraalVM for lightning-fast startup and minimal memory footprint
 - **Cloud-Native**: Designed for containerized deployment with health checks and monitoring
+- **Kafka Circuit Breaker**: Automatic per-topic consumer circuit breaker for fault tolerance
+
+## 🔌 Kafka Circuit Breaker
+
+This application includes an **automatic per-topic circuit breaker** for Kafka consumers that provides resilience and fault tolerance.
+
+### How It Works
+
+The circuit breaker monitors Kafka listener processing and automatically stops listener containers when a topic experiences excessive failures:
+
+- **Threshold**: 10 consecutive failures within a 60-second time window
+- **Scope**: Per-topic tracking (each topic is monitored independently)
+- **Action**: Stops all listener containers that subscribe to the failing topic
+- **Reset**: Consecutive failure counter resets automatically on successful message processing
+
+### Behavior
+
+1. **Failure Tracking**: Each time a Kafka listener throws an exception, the failure is recorded for that topic
+2. **Success Reset**: When a message is successfully processed, the failure counter for that topic is reset to zero
+3. **Circuit Trip**: When a topic reaches 10 consecutive failures within 60 seconds, the circuit breaker trips
+4. **Container Stop**: All listener containers subscribed to the failing topic are automatically stopped
+5. **Manual Recovery**: Stopped containers must be manually restarted via the actuator endpoint
+
+### Recovery
+
+When the circuit breaker trips and stops a container, you can restart it manually using the Spring Boot Actuator endpoint:
+
+```bash
+# Enable/start a stopped Kafka listener container
+# Replace {containerId} with the actual container ID from the logs
+curl -X POST http://localhost:8080/actuator/kafka
+```
+
+Or programmatically via the `KafkaListenerEndpointRegistry`:
+
+```java
+@Autowired
+private KafkaListenerEndpointRegistry registry;
+
+public void restartContainer(String containerId) {
+    MessageListenerContainer container = registry.getListenerContainer(containerId);
+    if (container != null && !container.isRunning()) {
+        container.start();
+    }
+}
+```
+
+### Monitoring
+
+The circuit breaker logs important events:
+
+- **Failure Recording**: `DEBUG` level logs when failures are recorded
+- **Counter Reset**: `INFO` level logs when success resets the counter
+- **Circuit Trip**: `ERROR` level logs when the circuit breaker trips, including:
+  - Topic name
+  - Number of failures
+  - Time window
+  - Affected container IDs
+
+Example log output:
+```
+2024-01-01 12:00:00 - Topic 'orders' has reached failure threshold: 10 consecutive failures within 60 seconds
+2024-01-01 12:00:00 - CIRCUIT BREAKER TRIPPED for topic 'orders'. Stopping 1 container(s): [ordersListener]
+2024-01-01 12:00:00 - Stopping container 'ordersListener' due to circuit breaker trip
+2024-01-01 12:00:00 - Container 'ordersListener' stopped successfully
+```
+
+### Configuration
+
+The circuit breaker is automatically configured for all Kafka listeners. No additional configuration is required.
+
+Key components:
+- **`TopicFailureTracker`**: Tracks failures per topic with a rolling 60-second window
+- **`KafkaCircuitBreaker`**: Manages trip logic and container stopping
+- **`TopicContainerMapping`**: Maps topics to listener container IDs
+- **`CircuitBreakerErrorHandler`**: Integrates with Spring Kafka error handling
+- **`CircuitBreakerRecordInterceptor`**: Tracks successful message processing
+
+### Example Usage
+
+```java
+@KafkaListener(id = "ordersListener", topics = "orders")
+public void handleOrder(Order order) {
+    // Process order
+    // If this throws an exception 10 times consecutively within 60s,
+    // the ordersListener container will be automatically stopped
+}
+
+@KafkaListener(id = "paymentsListener", topics = {"payments", "refunds"})
+public void handlePayment(Payment payment) {
+    // Process payment
+    // If either 'payments' or 'refunds' topic trips the circuit breaker,
+    // this entire listener container will be stopped
+}
+```
 
 ## 🚀 Quick Start
 
