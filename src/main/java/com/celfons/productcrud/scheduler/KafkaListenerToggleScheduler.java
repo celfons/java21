@@ -15,6 +15,10 @@ import java.util.concurrent.TimeUnit;
 /**
  * Scheduled job that polls a Redis key to control Kafka listener containers.
  * Checks Redis every configured interval and starts/stops all Kafka listeners based on the value.
+ * 
+ * Thread Safety: This component uses @Scheduled with fixedDelay, which ensures that
+ * only one execution of pollAndToggleListeners() runs at a time, eliminating the need
+ * for synchronization on the lastEffectiveState field.
  */
 @Component
 public class KafkaListenerToggleScheduler {
@@ -25,7 +29,8 @@ public class KafkaListenerToggleScheduler {
     private final KafkaListenerEndpointRegistry registry;
     private final KafkaListenerToggleProperties properties;
 
-    // Track last effective state to detect changes
+    // Track last effective state to detect changes.
+    // Thread-safe due to @Scheduled fixedDelay guaranteeing sequential execution.
     private Boolean lastEffectiveState = null;
 
     public KafkaListenerToggleScheduler(
@@ -40,6 +45,9 @@ public class KafkaListenerToggleScheduler {
     /**
      * Poll Redis key and control Kafka listeners based on value.
      * Only acts when the effective value changes from the last known state.
+     * 
+     * The SpEL expression in fixedDelayString is evaluated once at application startup,
+     * not on every execution, providing efficient dynamic configuration from properties.
      */
     @Scheduled(fixedDelayString = "#{@kafkaListenerToggleProperties.pollInterval.toMillis()}", 
                timeUnit = TimeUnit.MILLISECONDS)
