@@ -53,14 +53,12 @@ public class KafkaListenerToggleScheduler {
             
             // Only act if value has changed
             if (lastEffectiveState == null || lastEffectiveState != effectiveValue) {
-                boolean oldState = (lastEffectiveState != null) ? lastEffectiveState : effectiveValue;
-                lastEffectiveState = effectiveValue;
-                
                 // Get all listener containers
                 Collection<MessageListenerContainer> containers = registry.getAllListenerContainers();
                 
                 if (containers.isEmpty()) {
                     log.debug("No Kafka listener containers found to toggle");
+                    lastEffectiveState = effectiveValue;
                     return;
                 }
                 
@@ -71,16 +69,30 @@ public class KafkaListenerToggleScheduler {
                     stopAllContainers(containers);
                 }
                 
-                log.info("Kafka listeners toggled: key={}, {}->{}enabled, containers affected={}",
-                        properties.getRedisKey(),
-                        oldState == effectiveValue ? "" : (oldState ? "enabled->" : "disabled->"),
-                        effectiveValue ? "" : "dis",
-                        containers.size());
+                // Log the state change
+                String stateTransition = buildStateTransitionMessage(lastEffectiveState, effectiveValue);
+                log.info("Kafka listeners toggled: key={}, {}, containers affected={}",
+                        properties.getRedisKey(), stateTransition, containers.size());
+                
+                lastEffectiveState = effectiveValue;
             }
         } catch (Exception e) {
             log.error("Error polling Redis key '{}' for Kafka listener toggle: {}", 
                     properties.getRedisKey(), e.getMessage(), e);
         }
+    }
+
+    /**
+     * Build a human-readable state transition message for logging.
+     */
+    private String buildStateTransitionMessage(Boolean oldState, boolean newState) {
+        if (oldState == null) {
+            return "initialized to " + (newState ? "enabled" : "disabled");
+        }
+        if (oldState != newState) {
+            return (oldState ? "enabled" : "disabled") + " -> " + (newState ? "enabled" : "disabled");
+        }
+        return "state unchanged: " + (newState ? "enabled" : "disabled");
     }
 
     /**

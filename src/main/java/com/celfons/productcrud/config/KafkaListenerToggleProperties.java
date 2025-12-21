@@ -9,7 +9,7 @@ import java.time.Duration;
  * Configuration properties for Kafka listener toggle feature.
  * Allows controlling Kafka listeners via a Redis key.
  */
-@Component
+@Component("kafkaListenerToggleProperties")
 @ConfigurationProperties(prefix = "app.kafka.listeners.enabled")
 public class KafkaListenerToggleProperties {
 
