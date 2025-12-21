@@ -1,5 +1,6 @@
 package com.celfons.productcrud.kafka.circuitbreaker;
 
+import com.celfons.productcrud.kafka.testutil.FakeClock;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -8,10 +9,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.kafka.config.KafkaListenerEndpointRegistry;
 import org.springframework.kafka.listener.MessageListenerContainer;
-
-import java.time.Clock;
-import java.time.Instant;
-import java.time.ZoneId;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -161,31 +158,5 @@ class CircuitBreakerIntegrationTest {
     
     private ConsumerRecord<Object, Object> createRecord(String topic, long offset) {
         return new ConsumerRecord<>(topic, 0, offset, null, "test-value");
-    }
-    
-    /**
-     * Fake clock implementation for testing time-based logic.
-     */
-    private static class FakeClock extends Clock {
-        private Instant currentTime = Instant.parse("2024-01-01T00:00:00Z");
-        
-        public void advance(long seconds) {
-            currentTime = currentTime.plusSeconds(seconds);
-        }
-        
-        @Override
-        public Instant instant() {
-            return currentTime;
-        }
-        
-        @Override
-        public ZoneId getZone() {
-            return ZoneId.of("UTC");
-        }
-        
-        @Override
-        public Clock withZone(ZoneId zone) {
-            return this;
-        }
     }
 }

@@ -1,11 +1,8 @@
 package com.celfons.productcrud.kafka.circuitbreaker;
 
+import com.celfons.productcrud.kafka.testutil.FakeClock;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-
-import java.time.Clock;
-import java.time.Instant;
-import java.time.ZoneId;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -97,7 +94,7 @@ class TopicFailureTrackerTest {
             fakeClock.advance(5); // Advance 5 seconds each time (total 45s)
         }
         
-        // All 10 failures are within the window
+        // 11th failure should trip (10 from loop + 1 more = 11 total)
         boolean shouldTrip = tracker.recordFailure(topic);
         assertTrue(shouldTrip, "Should trip when 10+ failures within 60s window");
     }
@@ -153,31 +150,5 @@ class TopicFailureTrackerTest {
         
         // Should still be 0
         assertEquals(0, tracker.getFailureCount(topic));
-    }
-    
-    /**
-     * Fake clock implementation for testing time-based logic.
-     */
-    private static class FakeClock extends Clock {
-        private Instant currentTime = Instant.parse("2024-01-01T00:00:00Z");
-        
-        public void advance(long seconds) {
-            currentTime = currentTime.plusSeconds(seconds);
-        }
-        
-        @Override
-        public Instant instant() {
-            return currentTime;
-        }
-        
-        @Override
-        public ZoneId getZone() {
-            return ZoneId.of("UTC");
-        }
-        
-        @Override
-        public Clock withZone(ZoneId zone) {
-            return this;
-        }
     }
 }
