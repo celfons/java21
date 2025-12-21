@@ -82,6 +82,7 @@ graph LR
 - **SOLID Principles**: Interface segregation, dependency inversion, single responsibility
 - **Native Compilation**: GraalVM for lightning-fast startup and minimal memory footprint
 - **Cloud-Native**: Designed for containerized deployment with health checks and monitoring
+- **Redis-based Kafka Listener Toggle**: Dynamic control of Kafka listeners via Redis feature flags
 
 ## 🚀 Quick Start
 
@@ -91,6 +92,7 @@ graph LR
 - **Maven 3.8+**
 - **Docker 20.0+** (for containerized deployment)
 - **MongoDB Atlas Cluster** (free tier available at [mongodb.com/atlas](https://mongodb.com/atlas))
+- **Redis** (optional, for Kafka listener toggle feature)
 
 ### 1. MongoDB Atlas Setup
 
@@ -277,6 +279,85 @@ curl http://localhost:8080/api/products
 #### Search Products
 ```bash
 curl "http://localhost:8080/api/products/search?name=laptop"
+```
+
+## 🔄 Redis-based Kafka Listener Toggle
+
+This application includes a feature to dynamically control Kafka listener containers using a Redis key. This allows you to enable or disable all Kafka listeners at runtime without restarting the application.
+
+### How It Works
+
+- A scheduled job polls a Redis key every 5 seconds (configurable)
+- The key value should be `true` or `false` (case-insensitive)
+- When the value changes, all Kafka listener containers are started or stopped automatically
+- If the key doesn't exist or has an invalid value, a default value (true) is used
+
+### Configuration
+
+Configure the feature in `application.properties`:
+
+```properties
+# Redis connection
+spring.data.redis.host=localhost
+spring.data.redis.port=6379
+
+# Redis key to poll for enabling/disabling Kafka listeners (value: "true" or "false")
+app.kafka.listeners.enabled.redis-key=kafka:listeners:enabled
+
+# Default value when Redis key is missing or unparseable
+app.kafka.listeners.enabled.default=true
+
+# Polling interval for checking Redis key
+app.kafka.listeners.enabled.poll-interval=5s
+```
+
+### Usage Examples
+
+#### Enable Kafka Listeners
+
+```bash
+# Using redis-cli
+redis-cli SET kafka:listeners:enabled "true"
+
+# Using Docker
+docker exec -it redis redis-cli SET kafka:listeners:enabled "true"
+```
+
+#### Disable Kafka Listeners
+
+```bash
+# Using redis-cli
+redis-cli SET kafka:listeners:enabled "false"
+
+# Using Docker
+docker exec -it redis redis-cli SET kafka:listeners:enabled "false"
+```
+
+#### Check Current Value
+
+```bash
+# Using redis-cli
+redis-cli GET kafka:listeners:enabled
+
+# Using Docker
+docker exec -it redis redis-cli GET kafka:listeners:enabled
+```
+
+### Behavior
+
+- **Key value = `true`** (case-insensitive): All stopped Kafka listener containers are started
+- **Key value = `false`** (case-insensitive): All running Kafka listener containers are stopped
+- **Key missing or invalid**: Uses the default value from configuration (default: `true`)
+- **No containers**: Handled gracefully with no errors
+- **Change detection**: Only acts when the effective value changes from the previous state
+
+### Logging
+
+The feature logs important events:
+
+```
+INFO  - Kafka listeners toggled: key=kafka:listeners:enabled, disabled->enabled, containers affected=3
+INFO  - Kafka listeners toggled: key=kafka:listeners:enabled, enabled->disabled, containers affected=3
 ```
 
 ## 🧪 Testing
